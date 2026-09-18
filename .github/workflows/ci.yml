@@ -1,0 +1,77 @@
+name: Kit
+
+# A suite do kit roda na FONTE. O que os consumidores verificavam por copia
+# (MANIFEST, registry check, self-tests) e verificado uma vez, aqui, em todo
+# push e PR. Um MANIFEST divergente reprova antes de qualquer outra coisa.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  kit:
+    name: MANIFEST + registry + conformance + SDK
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LICEU_CONFORMANCE_STRICT: "1"
+    defaults:
+      run:
+        working-directory: liceu_protocol
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Dependencias do kit
+        run: python -m pip install --upgrade pip && pip install "pyyaml>=6.0" "jsonschema>=4.0"
+
+      # Identidade do kit. Bytes nao normalizados (.gitattributes -text).
+      - name: Package integrity (sha256sum -c MANIFEST)
+        run: |
+          cat VERSION
+          echo
+          sha256sum -c MANIFEST
+
+      - name: Registry consistency (liceu_registry_check.py)   # esperado: 0 erros
+        run: python liceu_registry_check.py
+
+      - name: Conformance self-test (liceu_conformance.py)      # esperado: 59/59
+        run: python liceu_conformance.py --self-test
+
+      - name: Federation SDK self-test (liceu_federation_sdk.py) # esperado: 25/25
+        run: python liceu_federation_sdk.py --self-test
+
+  package:
+    name: pip install . e MANIFEST no pacote instalado
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar o pacote
+        run: python -m pip install --upgrade pip && pip install .
+      # O que o consumidor recebe tem de ser o que a CI verificou: o MANIFEST
+      # e conferido DENTRO do site-packages, fora do checkout.
+      - name: MANIFEST do pacote instalado
+        run: |
+          cd /tmp
+          python - <<'PY'
+          import hashlib, subprocess, sys
+          from liceu_protocol import KIT_DIR, version
+          print("KIT_DIR =", KIT_DIR); print(version())
+          bad = 0
+          for line in (KIT_DIR / "MANIFEST").read_text().splitlines():
+              if not line or line.startswith("#"): continue
+              digest, name = line.split()
+              actual = hashlib.sha256((KIT_DIR / name).read_bytes()).hexdigest()
+              ok = actual == digest; bad += not ok
+              print(("OK   " if ok else "DIFF "), name)
+          sys.exit(1 if bad else 0)
+          PY

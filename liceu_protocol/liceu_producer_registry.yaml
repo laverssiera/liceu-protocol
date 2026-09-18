@@ -1,0 +1,564 @@
+meta:
+  artifact: LICEU_PRODUCER_REGISTRY
+  registry_version: 1.4.0
+  constitution_version: 1.15.0
+  fase: P2.2
+  regra: producer_id e IDENTIDADE, imutavel e independente de geografia. Localizacao vive em federation_id/node_id/scope.
+    Multiplas instancias da mesma classe sao legitimas.
+  constitution_sha256: 92a9dc9e47243cfc9e50a278e6de8e39fac1a93668a748daeba866ddf7e5d332
+  constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
+    ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
+  external_effect_criterio:
+  - cria obrigacao perante terceiro
+  - movimenta ou compromete capital
+  - despacha trabalho ou move recurso fisico
+  - altera ativo fisico
+  external_effect_regra: 'classificado por CAPACIDADE, nunca por produtor: 4 dos 15 sao mistos e ficariam
+    errados se classificados por produtor. Efeito INDIRETO nao conta (decisao CC1): um ranking que induz
+    aquisicao permanece interno, porque o efeito e do ato de adquirir.'
+  external_effect_uso: usado para DERIVAR legal_coverage=NOT_APPLICABLE no contrato liceu.anchor.authorization.
+    Subject de capacidade sem efeito externo -> NOT_APPLICABLE. Subject irresolvivel ou nao classificado
+    -> BLOCKED, nunca NOT_APPLICABLE por omissao (P04).
+  external_effect_condicoes:
+    liceu.research.experimentos_em_ambiente_isolado:
+      classificado: false
+      depende_do_gate: PD_HARDWARE_BRIDGE_IS_STUB
+      se_o_gate_cair: passa a external_effect=true
+  teto_semantica:
+    o_que_e: ALCADA — ate que degrau o monolito exerce a propria capacidade SOZINHO
+    nao_confundir_com: 'scale_max, que e MANDATO: ate que degrau ele pode REIVINDICAR alcance'
+    aplica_a:
+    - may_decide
+    - may_authorize
+    - may_execute
+    CORRECAO: o teto NAO pertence a may_decide. ANCHOR exerce alcada sobre may_authorize e OPERA sobre
+      may_execute. Nenhum mandato foi alterado.
+    invariante: teto_externo <= teto_interno <= scale_max
+    granularidade: '[DECIDIDO TA1] dois tetos por produtor, nao por classe de capacidade'
+    regra_de_avaliacao:
+    - 1. obter a capacidade que originou o fato
+    - 2. consultar external_effect dessa capacidade
+    - 3. teto_aplicavel = teto_externo se external_effect senao teto_interno
+    - 4. se event.scale <= teto_aplicavel -> decide sozinho
+    - 5. senao -> ESCALA para a Mae
+    teto_externo_NENHUM: 'significa duas coisas distintas: (a) o produtor nao tem capacidade externa —
+      vacuo, ver teto_externo_aplicavel; ou (b) tem, mas nao pode exerce-la sozinho em nenhum degrau.
+      Hoje todos os NENHUM sao caso (a).'
+  nota_classe_de_autoridade: liceu.authority e a 16a CLASSE canonica, nao o 16o monolito. Produz exclusivamente
+    fatos de autoridade e governanca federativa.
+  contagem:
+    soberanos: 15
+    classes_de_autoridade: 1
+    total: 16
+producers:
+  liceu.core:
+    canonical_key: core
+    display_name: LICEU CORE
+    authority_class: Constitution Plane
+    repository: LICEU_6.0_CONSTRUTORA_VIRTUAL
+    wave: W88
+    capabilities:
+      may_decide:
+      - contratos_validos
+      - identidades_validas
+      may_authorize:
+      - emissao_de_identidade_de_servico
+      may_execute:
+      - event_store
+      - contract_registry
+    state_ownership:
+    - immutable_events
+    - core_dna_contracts
+    - service_identities
+    instances:
+    - instance_id: liceu.core#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      contratos_validos: false
+      identidades_validas: false
+      emissao_de_identidade_de_servico: false
+      event_store: false
+      contract_registry: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: INTERPLANETARIA
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: so estado de protocolo; sem capacidade externa
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.archimedes:
+    canonical_key: archimedes
+    display_name: ARCHIMEDES
+    authority_class: Perception Plane
+    repository: Archimedes-ImobTech-LICEU-6.0-
+    wave: W89
+    capabilities:
+      may_decide:
+      - alternativas_territoriais
+      - ranking_de_candidatos
+      may_authorize:
+      - promocao_dos_proprios_estados_de_planejamento
+      may_execute: []
+    state_ownership:
+    - archimedes_root_states
+    instances:
+    - instance_id: liceu.archimedes#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      alternativas_territoriais: false
+      ranking_de_candidatos: false
+      promocao_dos_proprios_estados_de_planejamento: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: CONTINENTAL
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: planejar e barato; ranking que induz aquisicao acima de continental escala
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.cefeida:
+    canonical_key: cefeida
+    display_name: CEFEIDA
+    authority_class: Perception Plane
+    repository: 3C273-Analytics-Data-Science
+    wave: W90
+    capabilities:
+      may_decide: []
+      may_authorize: []
+      may_execute:
+      - ingestao
+      - metricas
+      - forecast
+    state_ownership: []
+    instances:
+    - instance_id: liceu.cefeida#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      ingestao: false
+      metricas: false
+      forecast: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: INTERPLANETARIA
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: 'REVISADO: alcada sobre may_execute (ingestao, metricas, forecast). Observar nao cria risco
+        em nenhum degrau'
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.john:
+    canonical_key: john
+    display_name: JOHN BRASILEIRO
+    authority_class: Cognition Plane
+    repository: John-Brasileiro-
+    wave: W91
+    capabilities:
+      may_decide:
+      - recomendacoes
+      - comparacao_de_alternativas
+      may_authorize: []
+      may_execute: []
+    state_ownership: []
+    instances:
+    - instance_id: liceu.john#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      recomendacoes: false
+      comparacao_de_alternativas: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: GLOBAL
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: recomendacao acima de global escala — inteligencia conjunta e da Mae
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.anchor:
+    canonical_key: anchor
+    display_name: ANCHOR
+    authority_class: Authority Plane
+    repository: ANCHOR.OS-LICEU6.0
+    wave: W92
+    capabilities:
+      may_decide: []
+      may_authorize:
+      - promocao_a_estado_autorizado
+      - revogacao
+      - supersessao
+      may_execute: []
+    state_ownership: []
+    instances:
+    - instance_id: liceu.anchor#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      promocao_a_estado_autorizado: false
+      revogacao: false
+      supersessao: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: LOCAL
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: 'alcada sobre may_authorize: promocao e revogacao rotineiras ate LOCAL'
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.opera:
+    canonical_key: opera
+    display_name: OPERA
+    authority_class: Reality Plane
+    repository: OPERA-ES-LICEU-6.0
+    wave: W93
+    capabilities:
+      may_decide: []
+      may_authorize: []
+      may_execute:
+      - projetos_operacionais
+      - ordens
+      - estados_de_execucao
+    state_ownership: []
+    instances:
+    - instance_id: liceu.opera#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      projetos_operacionais: true
+      ordens: true
+      estados_de_execucao: true
+    external_effect_summary: TODAS
+    teto:
+      scale_max: CONTINENTAL
+      teto_interno: LOCAL
+      teto_externo: LOCAL
+      teto_externo_aplicavel: true
+      razao: 'alcada sobre may_execute: ordem rotineira ate LOCAL'
+      nota_se_nao_aplicavel: null
+  liceu.bim:
+    canonical_key: bim
+    display_name: BIM.ARQ.ENG
+    authority_class: Reality Plane
+    repository: BIM.ARQ.ENG-LICEU-6.0-
+    wave: W94
+    capabilities:
+      may_decide:
+      - solucao_tecnica
+      - viabilidade_de_engenharia
+      may_authorize: []
+      may_execute:
+      - modelos_bim
+      - especificacoes
+      - digital_twin
+    state_ownership: []
+    instances:
+    - instance_id: liceu.bim#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      solucao_tecnica: false
+      viabilidade_de_engenharia: false
+      modelos_bim: true
+      especificacoes: true
+      digital_twin: true
+    external_effect_summary: MISTO
+    teto:
+      scale_max: CONTINENTAL
+      teto_interno: REGIONAL
+      teto_externo: LOCAL
+      teto_externo_aplicavel: true
+      razao: projeta ate regional
+      nota_se_nao_aplicavel: null
+  liceu.suppliers:
+    canonical_key: fornecedores
+    display_name: FORNECEDORES
+    authority_class: Reality Plane
+    repository: FORNECEDORES-LICEU-6.0
+    wave: W95
+    capabilities:
+      may_decide:
+      - sourcing
+      - qualificacao_de_fornecedor
+      may_authorize: []
+      may_execute:
+      - procurement
+      - contratacao_no_dominio
+    state_ownership: []
+    instances:
+    - instance_id: liceu.suppliers#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      sourcing: false
+      qualificacao_de_fornecedor: false
+      procurement: true
+      contratacao_no_dominio: true
+    external_effect_summary: MISTO
+    teto:
+      scale_max: GLOBAL
+      teto_interno: REGIONAL
+      teto_externo: LOCAL
+      teto_externo_aplicavel: true
+      razao: qualifica ate regional
+      nota_se_nao_aplicavel: null
+  liceu.econotech:
+    canonical_key: econotech
+    display_name: ECONOTECH
+    authority_class: Civilizational Feedback Plane
+    repository: ECONO.TECH-LICEU-6.0
+    wave: W96
+    capabilities:
+      may_decide:
+      - cenarios_economicos
+      - avaliacao_de_impacto
+      may_authorize: []
+      may_execute: []
+    state_ownership: []
+    instances:
+    - instance_id: liceu.econotech#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      cenarios_economicos: false
+      avaliacao_de_impacto: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: GLOBAL
+      teto_interno: GLOBAL
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: analisa externalidade em qualquer degrau do mandato
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.cea:
+    canonical_key: cea
+    display_name: CEA INVESTIMENTOS
+    authority_class: Civilizational Feedback Plane
+    repository: CEA-INVESTIMENTOS--LICEU-6.0-
+    wave: W97
+    capabilities:
+      may_decide:
+      - estrutura_de_capital
+      - viabilidade_financeira
+      may_authorize: []
+      may_execute: []
+    state_ownership: []
+    instances:
+    - instance_id: liceu.cea#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      estrutura_de_capital: true
+      viabilidade_financeira: false
+    external_effect_summary: MISTO
+    teto:
+      scale_max: GLOBAL
+      teto_interno: REGIONAL
+      teto_externo: LOCAL
+      teto_externo_aplicavel: true
+      razao: avalia viabilidade ate regional
+      nota_se_nao_aplicavel: null
+  liceu.legal:
+    canonical_key: juridicotech
+    display_name: JURIDICOTECH
+    authority_class: Civilizational Feedback Plane
+    repository: JURIDICO-TECH
+    wave: W98
+    capabilities:
+      may_decide:
+      - constraints_legais
+      - condicoes_de_aprovacao
+      may_authorize:
+      - aprovacao_juridica_no_proprio_dominio
+      may_execute: []
+    state_ownership: []
+    instances:
+    - instance_id: liceu.legal#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      constraints_legais: false
+      condicoes_de_aprovacao: false
+      aprovacao_juridica_no_proprio_dominio: true
+    external_effect_summary: MISTO
+    teto:
+      scale_max: REGIONAL
+      teto_interno: REGIONAL
+      teto_externo: LOCAL
+      teto_externo_aplicavel: true
+      razao: constraint ate o proprio scale_max
+      nota_se_nao_aplicavel: null
+  liceu.market:
+    canonical_key: gamemkt
+    display_name: GAME MKT
+    authority_class: Civilizational Feedback Plane
+    repository: GAME-MKT
+    wave: P15
+    capabilities:
+      may_decide:
+      - hipoteses_de_mercado
+      - estrategia_de_adocao
+      may_authorize: []
+      may_execute: []
+    state_ownership: []
+    instances:
+    - instance_id: liceu.market#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      hipoteses_de_mercado: false
+      estrategia_de_adocao: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: GLOBAL
+      teto_interno: GLOBAL
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: hipotese e estrategia nao movem nada
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.hub:
+    canonical_key: hub
+    display_name: HUB BACKOFFICE
+    authority_class: Civilizational Feedback Plane
+    repository: HUB-BACKOFICE-LICEU-6.0
+    wave: W99
+    capabilities:
+      may_decide: []
+      may_authorize: []
+      may_execute:
+      - projecoes
+      - dashboards
+    state_ownership: []
+    instances:
+    - instance_id: liceu.hub#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      projecoes: false
+      dashboards: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: INTERPLANETARIA
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: 'REVISADO: alcada sobre may_execute (projecoes, dashboards). Projecao herda; nao cria risco'
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.academy:
+    canonical_key: academia
+    display_name: ACADEMIA DO SABER
+    authority_class: Civilizational Feedback Plane
+    repository: LICEU-ACADEMIA-DO-SABER-
+    wave: W100
+    capabilities:
+      may_decide: []
+      may_authorize: []
+      may_execute:
+      - curricula
+      - playbooks
+      - lessons_learned
+    state_ownership: []
+    instances:
+    - instance_id: liceu.academy#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      curricula: false
+      playbooks: false
+      lessons_learned: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: INTERPLANETARIA
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: 'REVISADO: alcada sobre may_execute (curricula, playbooks). Conhecimento nao cria risco'
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.research:
+    canonical_key: ped
+    display_name: P&D.IA
+    authority_class: Civilizational Feedback Plane
+    repository: P-D-LICEU-6.0
+    wave: transversal
+    capabilities:
+      may_decide:
+      - hipoteses
+      - desenho_de_experimento
+      may_authorize: []
+      may_execute:
+      - experimentos_em_ambiente_isolado
+    state_ownership: []
+    instances:
+    - instance_id: liceu.research#earth-01
+      federation_id: earth
+      status: ACTIVE
+    external_effect:
+      hipoteses: false
+      desenho_de_experimento: false
+      experimentos_em_ambiente_isolado: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: GLOBAL
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: experimento isolado; condicionado ao gate PD_HARDWARE_BRIDGE_IS_STUB
+      nota_se_nao_aplicavel: 'NENHUM por construcao: o produtor nao tem capacidade com efeito externo'
+  liceu.authority:
+    canonical_key: authority
+    display_name: LICEU AUTHORITY (Mae)
+    authority_class: Authority Control Plane
+    producer_kind: AUTHORITY_CONTROL_PLANE
+    repository: null
+    wave: null
+    NAO_E_MONOLITO_SOBERANO: os 15 monolitos continuam sendo os produtores soberanos dos respectivos dominios.
+      liceu.authority nao possui engenharia, capital, territorio, direito, execucao nem qualquer estado
+      de dominio.
+    capabilities:
+      may_decide: []
+      may_authorize:
+      - autorizacao_acima_do_teto_delegado
+      - promocao_de_epoca
+      - estabelecimento_de_teto
+      may_execute: []
+    external_effect:
+      autorizacao_acima_do_teto_delegado: false
+      promocao_de_epoca: false
+      estabelecimento_de_teto: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: INTERPLANETARIA
+      teto_interno: INTERPLANETARIA
+      teto_externo: NENHUM
+      teto_externo_aplicavel: false
+      razao: a Mae e quem ESTABELECE tetos; nao esta sujeita a teto delegado
+      nota_se_nao_aplicavel: 'NENHUM por construcao: nao tem capacidade com efeito externo'
+    state_ownership:
+    - authority_epoch
+    - tetos delegados
+    - certificados de ativacao
+    instances:
+    - instance_id: liceu.authority#mother-a
+      authority_role: ACTIVE
+      status: PLANNED
+    - instance_id: liceu.authority#mother-b
+      authority_role: SUCCESSOR
+      status: PLANNED
+    - instance_id: liceu.authority#mother-witness
+      authority_role: WITNESS
+      status: PLANNED
+      PROIBICOES:
+      - nunca autoriza
+      - nunca estabelece teto
+      - nunca assume o papel da ativa
+    campos_obrigatorios_no_envelope:
+    - producer_id
+    - producer_instance_id
+    - authority_role
+    - authority_epoch
+    - authority_issuer_id
+    - activation_certificate_id
+    REGRA_DE_ORIGEM_DO_PAPEL: derivado da identidade AUTENTICADA da instancia, NUNCA de campo autodeclarado
+      no payload

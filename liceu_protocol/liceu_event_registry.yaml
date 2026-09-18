@@ -1,0 +1,111 @@
+meta:
+  artifact: LICEU_EVENT_REGISTRY
+  data: '2026-08-29'
+  constitution_version: 1.15.0
+  constitution_sha256: 92a9dc9e47243cfc9e50a278e6de8e39fac1a93668a748daeba866ddf7e5d332
+  regra: 'Contem SOMENTE eventos promovidos a contrato canonico. Nunca os 649 do discovery. Promocao exige:
+    classificacao no ledger + schema + SemVer + dono constitucional. Este registry e a FONTE dos conformance
+    tests.'
+  promocao: discovery -> ledger (classificado) -> registry (canonico) -> conformance
+  contract_registry_sha256: 2a9f4461d492842a50a09ce7da773acb864cb1c3312bc371291206c75eabd07d
+  constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
+    ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
+  versao: 1.4.0
+  nota_versao: campo unico e monotonico. Antes havia registry_version=1.1.0 e versao=1.2.0 simultaneos,
+    e a versao anterior (1.3.0) era superior a nova declarada.
+events:
+  archimedes.planning.state.authoritative:
+    owner: liceu.archimedes
+    allowed_producers:
+    - liceu.archimedes
+    classification: AUTHORITATIVE_EVENT
+    contract_id: liceu.archimedes.planning-state
+    contract_version: 1.0.0
+    payload_schema: liceu_contract_registry.yaml#/contracts/liceu.archimedes.planning-state/payload_schema
+    transport:
+      canonical_publish: http
+      asynchronous_propagation: nats_jetstream
+    implementation_status: DECLARED_BUT_NOT_IMPLEMENTED
+    conformance_tests: []
+    posicao_na_cadeia: 1
+    contract_lifecycle: DECLARED
+  cefeida.evidence.published:
+    owner: liceu.cefeida
+    allowed_producers:
+    - liceu.cefeida
+    classification: AUTHORITATIVE_EVENT
+    contract_id: liceu.cefeida.evidence
+    contract_version: 1.0.0
+    payload_schema: liceu_contract_registry.yaml#/contracts/liceu.cefeida.evidence/payload_schema
+    transport:
+      canonical_publish: http
+      asynchronous_propagation: nats_jetstream
+    implementation_status: DECLARED_BUT_NOT_IMPLEMENTED
+    conformance_tests: []
+    posicao_na_cadeia: 2
+    contract_lifecycle: DECLARED
+  john.recommendation.generated:
+    owner: liceu.john
+    allowed_producers:
+    - liceu.john
+    classification: AUTHORITATIVE_EVENT
+    contract_id: liceu.john.recommendation
+    contract_version: 1.0.0
+    payload_schema: liceu_contract_registry.yaml#/contracts/liceu.john.recommendation/payload_schema
+    transport:
+      canonical_publish: http
+      asynchronous_propagation: nats_jetstream
+    implementation_status: DECLARED_WRONG_OWNER
+    conformance_tests: []
+    blocker: produzido por liceu.opera em apps/opera/api/construction.py. O executor nao pode produzir
+      a recomendacao que legitima a propria execucao. Remover antes de promover.
+    posicao_na_cadeia: 3
+    contract_lifecycle: DECLARED
+  anchor.authorization.granted:
+    owner: liceu.anchor
+    allowed_producers:
+    - liceu.anchor
+    classification: AUTHORITATIVE_EVENT
+    contract_id: liceu.anchor.authorization
+    contract_version: 1.1.0
+    payload_schema: liceu_contract_registry.yaml#/contracts/liceu.anchor.authorization/payload_schema
+    transport:
+      canonical_publish: http
+      asynchronous_propagation: nats_jetstream
+    implementation_status: DECLARED_BUT_NOT_IMPLEMENTED
+    conformance_tests: []
+    posicao_na_cadeia: 4
+    contract_lifecycle: DECLARED
+  opera.execution.created:
+    owner: liceu.opera
+    allowed_producers:
+    - liceu.opera
+    classification: AUTHORITATIVE_EVENT
+    contract_id: liceu.opera.execution
+    contract_version: 1.0.0
+    payload_schema: liceu_contract_registry.yaml#/contracts/liceu.opera.execution/payload_schema
+    transport:
+      canonical_publish: http
+      asynchronous_propagation: nats_jetstream
+    implementation_status: DECLARED_BUT_NOT_IMPLEMENTED
+    conformance_tests: []
+    posicao_na_cadeia: 5
+    contract_lifecycle: DECLARED
+  authority.human.decision.recorded:
+    owner: liceu.authority
+    contract_id: liceu.authority.human-decision
+    contract_version: 2.0.0
+    posicao_na_cadeia: null
+    descricao: decisao humana de contingencia, registrada com lineage completo
+    natureza: RAMIFICACAO_DE_CONTINGENCIA
+    transport: HTTP boundary oficial
+    implementation_status: NAO_INICIADA
+    schema: ver liceu.authority.human-decision 1.1.0
+    contract_lifecycle: ACTIVE
+    nota: contract_lifecycle e do CONTRATO; implementation_status e do CODIGO. Nao sao contraditorios
+      — sao eixos distintos.
+resumo:
+  CANONICAL_REGISTRY_EVENTS: 6
+  CONTRACT_IDS: 8
+  CONTRACT_VERSIONS: 10
+  IMPLEMENTED_IN_MONOLITH: 0

@@ -1,0 +1,1834 @@
+meta:
+  versao: 1.15.0
+  status: FINAL
+  data: '2026-08-29'
+  pendencias_abertas: 0
+  adrs_pendentes: 1
+  milestone_corrente: M2_FEDERATION_PROTOCOL_AND_STATIC_CONVERGENCE
+  changelog_1_4_2: 'PATCH: corrige milestone.current_constitution_version que estava stale em 1.3.0. Nenhum
+    invariante alterado. Descoberta empirica -> nova regra R0C no Registry Checker.'
+  changelog_1_5_0: 'MINOR: acrescenta federation_scale — enum de 6 degraus, default LOCAL, invariante
+    de propagacao e resolucao de planetary como sinonimo de GLOBAL. Nenhum invariante anterior alterado.'
+  changelog_1_6_0: 'MINOR: acrescenta federation_cognition, modelando as duas camadas cognitivas (JOHN
+    local e JOHN central) e a regra de identidade que as separa. Nenhum invariante anterior alterado;
+    nenhum mandato alterado.'
+  changelog_1_7_0: 'MINOR: acrescenta federation_authority, modelando a Mae LICEU como autoridade de ultima
+    instancia e a delegacao com teto. Revisa a missao do liceu.anchor para guardiao de ciclo de vida.
+    may_authorize do ANCHOR inalterado — passa a ser lido como delegado.'
+  changelog_1_8_0: 'MINOR: generaliza a delegacao para os 15 monolitos. Corrige a leitura de may_decide=[]
+    — passa a significar TETO ZERO, nao ausencia de camada cognitiva. Nenhuma capacidade alterada.'
+  changelog_1_9_0: 'MINOR: acrescenta a camada HUMANO como ultima instancia real e o requisito DOSSIE_DE_DECISAO.
+    Substitui o fallback que ampliava autonomia na indisponibilidade da Mae.'
+  changelog_1_10_0: 'MINOR: acrescenta MAE_REDUNDANTE — topologia ativa-passiva com epoca de autoridade
+    monotonica. Humano passa a ser acionado apenas quando as duas Maes estao indisponiveis.'
+  changelog_1_11_0: 'MINOR: acrescenta a Mae TESTEMUNHA — terceira instancia que observa e arbitra sem
+    NUNCA autorizar. Restaura quorum, fecha a deteccao de dupla queda e passa a ser o montador do dossie
+    para o humano.'
+  changelog_1_12_0: 'MINOR: (1) precisa a fronteira do ANCHOR — governa continuidade, nao executa manutencao
+    fisica; (2) atribui a propriedade constitucional do envelope ao CORE e fixa o nome LICEU Federation
+    Envelope; (3) acrescenta camadas transversais e modulos estrategicos, com a regra de que nenhuma governa
+    dominio; (4) acrescenta core_dna com a fronteira semantica. Nenhuma capacidade, teto ou contrato alterado.'
+  changelog_1_13_0: 'MINOR: ratifica D-037, D-038, D-039 e D-040. Acrescenta liceu.authority como classe
+    de autoridade do control plane com 3 instancias e regra de aceitacao no Event Store; posicao do humano;
+    modo degradado; comportamento na queda da testemunha; G6 obrigatorio com PASS_PARTIAL proibido.'
+  changelog_1_14_0: 'MINOR: campanha LIC-AUTHORITY-PROTOCOL-002. Envelope vNext com 6 campos de autoridade
+    e escala, com origem na identidade autenticada; decisao humana como RAMIFICACAO de contingencia com
+    escalation_reason e autenticacao forte obrigatoria; identidade semantica de replay com 12 campos;
+    verificacao de hash server-side; event_id globalmente unico.'
+  changelog_1_15_0: 'PATCH de recuperacao (LIC-PROTOCOL-RECOVERY-003): restaura decision_id, governance_decision_id
+    e execution_id no envelope; separa autoridade_da_cadeia de autoridade_do_control_plane; separa campos_exigidos_pelo_protocolo
+    de campos_aceitos_pelo_servidor, este ultimo refletindo o CORE real.'
+global:
+  canonical_envelope:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    nome: LICEU Federation Envelope
+    versao: vNext
+    owner: core
+    principio: ONE ENVELOPE, MANY DOMAIN PAYLOAD CONTRACTS
+    nota: Incorpora as propriedades superiores do envelope do JOHN (lineage, fingerprints deterministicos)
+      SEM transferir ownership do contrato federativo ao JOHN. Nao criar mega-schema por dominio.
+    campos:
+      identidade:
+      - event_id
+      - event_type
+      - producer_id
+      contrato:
+      - contract_id
+      - contract_version
+      correlacao:
+      - trace_id
+      - source_event_id
+      - parent_event_id
+      - causation_id
+      objeto:
+      - artifact_id
+      - scope
+      carga:
+      - payload
+      - payload_hash
+      - envelope_fingerprint
+      tempo:
+      - observed_at
+      - emitted_at
+      escala:
+      - scale
+      autoridade_da_cadeia:
+      - decision_id
+      - governance_decision_id
+      - execution_id
+      autoridade_do_control_plane:
+      - producer_instance_id
+      - authority_role
+      - authority_epoch
+      - authority_issuer_id
+      - activation_certificate_id
+    campos_proibidos:
+      contract: usar contract_id + contract_version
+      meta: lineage e campo de topo, nao aninhado
+      signature: usar payload_hash + envelope_fingerprint
+    migracao:
+    - 'archimedes: trocar `contract` por contract_id+contract_version; emitir artifact_id'
+    - 'juridicotech: desaninhar meta{}; remover signature literal'
+    - 'cea: contract_version para SemVer; remover resolve_event redundante'
+    - 'econotech: corrigir get_event_by_id (le envelope em vez do item)'
+    nome_canonico: LICEU Federation Envelope
+    propriedade_constitucional: liceu.core
+    procedencia_da_implementacao:
+      referencia_tecnica: liceu.john
+      texto: implementado primeiro no JOHN e a melhor referencia tecnica do ecossistema. A PROPRIEDADE
+        constitucional e do CORE.
+      NAO_chamar_de: envelope do JOHN
+      razao: o CORE guarda identidade, contratos e protocolo. Atribuir o envelope a um produtor de recomendacao
+        confundiria quem informa com quem define o protocolo.
+      precedente_interno: internal_reference_implementations — implementar primeiro nao e possuir
+    REGRA_DE_ORIGEM_DOS_CAMPOS_DE_AUTORIDADE:
+      texto: os campos de autoridade vem da IDENTIDADE AUTENTICADA ou do estado do control plane. NUNCA
+        do payload livre.
+      proibido: aceitar authority_role, authority_epoch, authority_issuer_id ou activation_certificate_id
+        declarados pelo produtor no corpo da requisicao
+      razao: se o papel vier do payload, qualquer instancia se declara ACTIVE e a topologia de autoridade
+        deixa de valer
+    campos_novos_vNext:
+      scale:
+        origem: produtor
+        default_na_normalizacao: LOCAL
+      producer_instance_id:
+        origem: identidade autenticada
+      authority_role:
+        origem: identidade autenticada
+        valores:
+        - ACTIVE
+        - SUCCESSOR
+        - WITNESS
+      authority_epoch:
+        origem: control plane
+        tipo: inteiro monotonico
+      authority_issuer_id:
+        origem: control plane
+      activation_certificate_id:
+        origem: control plane
+    REGRESSAO_CORRIGIDA:
+      id: SOBRESCREVI_O_GRUPO_AUTORIDADE
+      o_que_aconteceu: o grupo 'autoridade' continha decision_id, governance_decision_id e execution_id.
+        Foi sobrescrito com os campos do control plane, removendo os tres do envelope canonico.
+      gravidade: os tres removidos sao exatamente os que forbidden_envelope_fields usa para impedir salto
+        de etapa
+      correcao: 'dois grupos distintos: autoridade_da_cadeia (quem decidiu, quem governou, quem executou)
+        e autoridade_do_control_plane (qual Mae, qual papel, qual epoca)'
+      por_que_sao_coisas_diferentes: autoridade_da_cadeia identifica os ATOS da cadeia causal. autoridade_do_control_plane
+        identifica QUEM autoriza acima do teto. Um e lineage; o outro e governanca de instancia.
+  campos_aceitos_pelo_servidor:
+    procedencia: '[CODIGO] cv-backend-core/app/main.py:617 FederationEventPublishRequest'
+    campos:
+    - event_id
+    - event_type
+    - source
+    - contract_id
+    - contract_version
+    - trace_id
+    - source_event_id
+    - parent_event_id
+    - causation_id
+    - decision_id
+    - governance_decision_id
+    - execution_id
+    - artifact_id
+    - scope
+    - payload
+    - idempotency_key
+    obrigatorios_para_rastreabilidade:
+    - contract_id
+    - contract_version
+    - artifact_id
+    campos_descartados_silenciosamente:
+    - nome: contract
+      emitido_por: archimedes
+      observacao: '[CODIGO] Nao existe no schema; Pydantic descarta sem erro. A coluna `contract` EXISTE
+        na tabela e e lida por quem entra via SQL direto. Dado visivel por um caminho e invisivel por
+        outro.
+
+        '
+    - nome: meta
+      emitido_por: juridicotech
+    - nome: signature
+      emitido_por: juridicotech
+      observacao: '[CODIGO] valor literal ''sha256'' — nome do algoritmo, nao assinatura'
+    versao: ESTADO REAL DO CORE — nao alterado por esta campanha
+    nota: campos de autoridade sao PERSISTIDOS mas NAO aceitos do payload — derivados da identidade autenticada
+      e do control plane
+    ATENCAO: esta chave descreve o que o CORE ACEITA HOJE. Nao e requisito.
+    verificado_em: cv-backend-core/app/main.py:617 FederationEventPublishRequest
+  contract_version_policy:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    formato: SemVer estrito MAJOR.MINOR.PATCH
+    identidade_do_contrato: (contract_id, contract_version)
+    queryable: true
+    validos:
+    - 1.0.0
+    - 1.1.0
+    - 2.0.0
+    invalidos:
+    - v1
+    - '1.0'
+    - latest
+    - null
+    - ''
+    regex: ^\d+\.\d+\.\d+$
+    justificativa: contract_version filtravel e indispensavel para replay historico
+    acao_no_servidor: tornar contract_version filtravel em _filter_federation_events
+  canonical_producer_ids:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    principio: ID tecnico imutavel, independente de nome comercial e de geografia
+    registro:
+      core:
+        producer_id: liceu.core
+        display_name: LICEU CORE
+      archimedes:
+        producer_id: liceu.archimedes
+        display_name: ARCHIMEDES
+      cefeida:
+        producer_id: liceu.cefeida
+        display_name: CEFEIDA
+      john:
+        producer_id: liceu.john
+        display_name: JOHN BRASILEIRO
+      anchor:
+        producer_id: liceu.anchor
+        display_name: ANCHOR
+      opera:
+        producer_id: liceu.opera
+        display_name: OPERA
+      bim:
+        producer_id: liceu.bim
+        display_name: BIM.ARQ.ENG
+      fornecedores:
+        producer_id: liceu.suppliers
+        display_name: FORNECEDORES
+      econotech:
+        producer_id: liceu.econotech
+        display_name: ECONOTECH
+      cea:
+        producer_id: liceu.cea
+        display_name: CEA INVESTIMENTOS
+      juridicotech:
+        producer_id: liceu.legal
+        display_name: JURIDICOTECH
+      gamemkt:
+        producer_id: liceu.market
+        display_name: GAME MKT
+      hub:
+        producer_id: liceu.hub
+        display_name: HUB BACKOFFICE
+      academia:
+        producer_id: liceu.academy
+        display_name: ACADEMIA DO SABER
+      ped:
+        producer_id: liceu.research
+        display_name: P&D.IA
+    separar_de:
+    - canonical_id
+    - display_name
+    - repository
+    - aliases
+    - instance_id
+    - federation_id
+    regra_de_escala:
+      proibido:
+      - earth.archimedes
+      - mars.archimedes
+      correto: producer_id permanece liceu.archimedes; a localizacao vive em federation_id / node_id /
+        scope / territorial_context
+      razao: o dominio nao muda com o corpo celeste; a identidade federativa e independente da geografia
+  transport_policy:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    decisao: ambos, com funcoes constitucionais distintas
+    http:
+      papel: synchronous federation boundary
+      usos:
+      - query
+      - command
+      - validation
+      - resolution
+      - health
+      - authentication
+    nats_jetstream:
+      papel: asynchronous event fabric
+      usos:
+      - facts
+      - state transitions
+      - fan-out
+      - subscriptions
+      - durable propagation
+    ambos_devem_usar:
+    - same producer identity
+    - same canonical contracts
+    - same lineage semantics
+    - same trace context
+    - same Federation Envelope
+    proibido: DIRECT CROSS-DOMAIN SQL
+    acao: convergir os 6 streams NATS para namespace comum sob a mesma identidade de produtor
+    semantica_de_evento:
+      principio: ONE CANONICAL EVENT — dois caminhos, nunca dois fatos
+      http: registro/publicacao no Event Store canonico (boundary sincrono)
+      jetstream: propagacao durable assincrona do MESMO fato
+      invariante: event_id, envelope_fingerprint e lineage identicos nos dois caminhos
+      nao_significa: 'transport: [http, nats] NAO obriga publicar duas vezes nem cria dois eventos independentes'
+    formato_por_evento: transport.canonical_publish + transport.asynchronous_propagation. O formato de
+      lista [http, nats] induzia a pensar que ambos sao publicacoes obrigatorias e independentes. Sao
+      papeis distintos sobre O MESMO fato.
+  authority_model:
+    procedencia: '[DOC][CERT]'
+    principio: EVIDENCE != RECOMMENDATION != AUTHORIZATION != EXECUTION != OBSERVATION != LEARNING
+    referencia_implementada: '[CERT] archimedes W89B3 Authority Kernel'
+    estados_formais:
+    - DRAFT
+    - OBSERVATION
+    - ANALYSIS
+    - RECOMMENDATION
+    - VALIDATED
+    - AUTHORITATIVE
+    - AUTHORITATIVE_OUTPUT
+    - SUPERSEDED
+    - REJECTED
+    observacao: '[CODIGO] Implementado em 1 de 15 monolitos. Nos outros 14 a separacao e documento, nao
+      codigo.
+
+      '
+  security_model:
+    procedencia: '[CERT][CODIGO]'
+    auth_event_store: X-Canonical-Service-Secret
+    auth_core_dna: 'Authorization: Bearer <JWT>'
+    regra_absoluta: '[CERT] JWT_SECRET_KEY nunca sai do CORE'
+    nunca_confundir:
+    - CANONICAL_EVENT_STORE_API_SECRET NAO e Bearer do CORE-DNA
+    - ARCHIMEDES_CORE_DNA_CLIENT_SECRET NAO e Bearer de runtime
+    variaveis_canonicas:
+    - CANONICAL_EVENT_STORE_API_URL
+    - CANONICAL_EVENT_STORE_API_SECRET
+    aliases_proibidos:
+      procedencia: '[CODIGO]'
+      lista:
+      - FEDERATION_API_URL
+      - CANONICAL_SERVICE_SECRET
+      observacao: ARCHIMEDES aceita estes; nenhum outro monolito reconhece
+  antipadroes:
+    antipadrao_1_db_coupling:
+      severidade: CRITICO
+      regra: Nenhum monolito acessa banco/estado interno de outro
+      deteccao: liceu_core_os | FROM public.events fora do CORE
+      violacao_conhecida: '[CODIGO] bim/runtime/bim_arch_eng/wave89a_canonical_resolution_gate.py'
+    antipadrao_2_valor_inventado:
+      severidade: CRITICO
+      regra: dado ausente -> BLOCKED. Nunca inventar valor e seguir o pipeline
+      padrao_correto: missing input -> BLOCKED -> identificar produtor -> request formal -> retomar
+      deteccao: marcador de mock JUNTO COM I/O comentado
+      violacao_conhecida: '[CODIGO] core/runtime/persistence/event_store_pg.py — psycopg2 e todos os cur.execute
+        comentados; append_event loga sucesso e nao persiste; get_events retorna []. Indistinguivel de
+        "agregado nao existe".
+
+        '
+      nota_de_escopo: 'O caminho canonico REAL (cv-backend-core/app/main.py) grava em Postgres e funciona
+        [CERT]. Este arquivo esta na arvore paralela runtime/. PRE-REQUISITO P0: verificar quem o importa.
+
+        '
+    antipadrao_3_fallback_silencioso:
+      severidade: ALTO
+      regra: Faltando credencial/URL canonica -> falhar fechado, nunca default
+      referencia_correta: '[CODIGO] fornecedores/backend/app/services/canonical_federation_client.py (ValueError
+        nos 4 metodos)'
+  principios_constitucionais:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    P01: ONE AUTHORITATIVE STATE -> ONE DOMAIN OWNER
+    P02: PROJECTION != OWNERSHIP
+    P03: AI OUTPUT != AUTHORITATIVE FACT
+    P04: MISSING AUTHORITATIVE INPUT -> BLOCKED
+    P05: EXPERIMENT != PRODUCTION TRUTH
+    P06: NO CROSS-DOMAIN DATABASE ACCESS
+    P07: EVIDENCE != RECOMMENDATION != AUTHORIZATION != EXECUTION != OBSERVATION != LEARNING
+  politica_de_severidade:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    development: CRITICO
+    pull_request: ALTO
+    certification: MEDIO
+  scope_model:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    principio: generalizacao nos primitives, nao em features de Marte
+    hierarquia:
+    - federation_id
+    - civilization_id
+    - planetary_system_id
+    - celestial_body_id
+    - region_id
+    - territory_id
+    - site_id
+    - asset_id
+    separar: territory != jurisdiction
+    temporalidade:
+    - observed_at
+    - valid_from
+    - valid_until
+    - effective_at
+    - supersedes
+  event_ownership:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    principio: O checker nao adivinha autoridade pelo nome do evento. A Constituicao declara. Producao
+      por classe de autoridade nao autorizada e AUTHORITY_VIOLATION (CRITICO).
+    regra_de_instancia: allowed_producers lista CLASSES de autoridade (producer_id). Multiplas INSTANCIAS
+      da mesma classe sao permitidas — necessario para o modelo global/interplanetario.
+    archimedes.planning.state.authoritative:
+      authoritative_owner: liceu.archimedes
+      allowed_producers:
+      - liceu.archimedes
+      lifecycle: PLANNED
+      transport:
+        canonical_publish: http
+        asynchronous_propagation: nats_jetstream
+    cefeida.evidence.published:
+      authoritative_owner: liceu.cefeida
+      allowed_producers:
+      - liceu.cefeida
+      lifecycle: PLANNED
+      transport:
+        canonical_publish: http
+        asynchronous_propagation: nats_jetstream
+    john.recommendation.generated:
+      authoritative_owner: liceu.john
+      allowed_producers:
+      - liceu.john
+      lifecycle: PLANNED
+      transport:
+        canonical_publish: http
+        asynchronous_propagation: nats_jetstream
+    anchor.authorization.granted:
+      authoritative_owner: liceu.anchor
+      allowed_producers:
+      - liceu.anchor
+      lifecycle: PLANNED
+      transport:
+        canonical_publish: http
+        asynchronous_propagation: nats_jetstream
+    opera.execution.created:
+      authoritative_owner: liceu.opera
+      allowed_producers:
+      - liceu.opera
+      lifecycle: PLANNED
+      transport:
+        canonical_publish: http
+        asynchronous_propagation: nats_jetstream
+    john.decision.made:
+      authoritative_owner: liceu.john
+      allowed_producers:
+      - liceu.john
+      lifecycle: ACTIVE
+      nota: grafo detectou producao por bim e cefeida — nenhum tem may_decide
+      transport:
+        canonical_publish: null
+        asynchronous_propagation: nats_jetstream
+    john.finance.decision:
+      authoritative_owner: liceu.john
+      allowed_producers:
+      - liceu.john
+      lifecycle: ACTIVE
+      transport:
+        canonical_publish: null
+        asynchronous_propagation: nats_jetstream
+    contract.created:
+      authoritative_owner: liceu.legal
+      allowed_producers:
+      - liceu.legal
+      lifecycle: DEPRECATED
+      nota: 'namespace ambiguo: core=schema contract, legal=acordo, hub=projecao. Migrar para core.contract.registered
+        / legal.contract.created / hub.projection.updated'
+      transport:
+        canonical_publish: null
+        asynchronous_propagation: nats_jetstream
+    contract.signed:
+      authoritative_owner: liceu.legal
+      allowed_producers:
+      - liceu.legal
+      lifecycle: DEPRECATED
+      transport:
+        canonical_publish: null
+        asynchronous_propagation: nats_jetstream
+    hub.budget.approved:
+      authoritative_owner: liceu.cea
+      allowed_producers:
+      - liceu.cea
+      lifecycle: DEPRECATED
+      nota: HUB nao e autoridade financeira. Consumidores (archimedes, gamemkt) esperam autoridade que
+        constitucionalmente nao existe. Renomear para cea.budget.approved e migrar consumidores.
+      transport:
+        canonical_publish: null
+        asynchronous_propagation: nats_jetstream
+    hub.budget.limit:
+      authoritative_owner: liceu.cea
+      allowed_producers:
+      - liceu.cea
+      lifecycle: DEPRECATED
+      transport:
+        canonical_publish: null
+        asynchronous_propagation: nats_jetstream
+  event_namespace_policy:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    principio: 'Namespace comum nao basta: a taxonomia deve PRESERVAR AUTORIDADE'
+    formato: <authority>.<aggregate>.<fact>
+    exemplos_corretos:
+    - core.contract.registered
+    - legal.contract.created
+    - legal.contract.signed
+    - hub.projection.updated
+    - cea.budget.approved
+    antipadrao: contract.created — nao revela qual autoridade produziu
+  event_classification_taxonomy:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    fase: P2.5 — Event Graph Reconciliation
+    valores:
+    - AUTHORITATIVE_EVENT
+    - DOMAIN_EVENT
+    - COMMAND
+    - QUERY
+    - PROJECTION_EVENT
+    - INTERNAL_EVENT
+    - CERTIFICATION_EVENT
+    - LEGACY
+    - DEPRECATED
+    - DEAD_CODE
+    - FALSE_POSITIVE
+    - FUTURE_CONTRACT
+    criterio_de_milestone: UNCLASSIFIED_ORPHAN_EVENTS=0 (nunca ORPHAN_EVENTS=0)
+    nota_certification_event: Waves, gates e artifacts de certificacao nao sao INTERNAL_EVENT. Separar
+      BUSINESS/DOMAIN HISTORY de CERTIFICATION HISTORY sem apagar lineage.
+  internal_reference_implementations:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    regra: Para quase toda pratica ruim disseminada existe um monolito que ja resolveu. Extrair o INVARIANTE,
+      nunca copiar o codigo nem a divida incidental do repositorio de origem.
+    referencias:
+      fail_closed:
+        invariante: configuracao federativa ausente -> erro explicito
+        referencia: liceu.suppliers
+        aplica_a: 9 monolitos com fallback silencioso
+      envelope_canonico:
+        invariante: contract_id + contract_version + artifact_id
+        referencia: liceu.john
+        aplica_a: os outros 14
+      authority_boundary:
+        invariante: maquina de estados que rejeita salto de etapa
+        referencia: liceu.archimedes
+        aplica_a: os outros 14
+      higiene_de_repositorio:
+        invariante: sem artefato de build versionado, NATS organizado
+        referencia: liceu.opera
+        aplica_a: liceu.legal, liceu.academy, liceu.market
+      segredo_criptografado:
+        invariante: SealedSecret, nunca texto plano
+        referencia: liceu.john
+        aplica_a: liceu.bim, liceu.market
+      blocked_por_input_ausente:
+        invariante: input autoritativo ausente -> BLOCKED, nunca inventar
+        referencia: liceu.bim
+        aplica_a: todos
+  ci_adoption_order:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    criterio: proximidade da cadeia causal minima e importancia federativa
+    ordem:
+    - liceu.core
+    - liceu.opera
+    - liceu.anchor
+    - liceu.suppliers
+    - liceu.cea
+    nota: P&D pode esperar — nao ha codigo para verificar
+    nao_bloqueador: CI universal dos 15 nao e blocker inicial
+    rampa:
+      development: CRITICO
+      pull_request: ALTO
+      certification: MEDIO
+  volume_metric_policy:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    regra: analise de volume de capacidade EXCLUI artefatos antes de medir
+    excluir:
+    - node_modules/
+    - dist/
+    - build/
+    - coverage/
+    - .next/
+    - __pycache__/
+    - '*.pyc'
+    - '*.map'
+    evidencia: 'contagem bruta enganava: JURIDICOTECH 2871->530 (6o maior, nao 1o), ACADEMIA 1376->317
+      (3o menor com codigo, nao 4o maior)'
+  authority_scope_clarification:
+    procedencia: '[CORRECAO 2026-08-29]'
+    regra: may_decide / may_authorize / may_execute valem DENTRO do estado soberano de cada autoridade,
+      nunca sobre dominio alheio.
+    exemplo: 'liceu.core may_authorize = [emissao_de_identidade_de_servico]. Isso NAO o torna super-autoridade:
+      ele nao autoriza engenharia, capital nem direito.'
+    apresentacao: 'relatorios devem mostrar as capacidades ESCOPADAS, nunca "pode: decide, autoriza, executa"
+      sem a lista.'
+  env_var_migration:
+    procedencia: '[DECIDIDO 2026-08-29]'
+    canonicas:
+    - CANONICAL_EVENT_STORE_API_URL
+    - CANONICAL_EVENT_STORE_API_SECRET
+    aliases_a_remover:
+    - FEDERATION_API_URL
+    - CANONICAL_SERVICE_SECRET
+    onde: ARCHIMEDES aceita os aliases; nenhum outro monolito os reconhece
+    regra: 'O SDK REJEITA os aliases. A migracao deve ser DELIBERADA: antes de instalar o SDK, verificar
+      se a mudanca rompe configuracao ja certificada. Nunca migrar em silencio.'
+    procedimento:
+    - inventariar onde os aliases estao configurados hoje
+    - provisionar as variaveis canonicas em paralelo
+    - confirmar leitura pelas canonicas
+    - remover os aliases
+    - so entao instalar o SDK
+    risco_se_ignorado: W89B4R usa secrets de Codespaces ja provisionados
+  federation_scale:
+    procedencia: '[DECIDIDO 2026-08-29] lista mestre de evolucao do LICEU 6.0'
+    campo: scale
+    tipo: enum fechado, ordenado
+    niveis:
+    - ordem: 1
+      valor: LOCAL
+      abrange: projeto, obra, cidade
+    - ordem: 2
+      valor: REGIONAL
+      abrange: regiao, nacional
+    - ordem: 3
+      valor: CONTINENTAL
+    - ordem: 4
+      valor: GLOBAL
+    - ordem: 5
+      valor: CIVILIZACIONAL
+    - ordem: 6
+      valor: INTERPLANETARIA
+    representacao: 'string maiuscula no envelope. A ordem e mapa no codigo, NUNCA gravada no envelope:
+      reordenar a escala reescreveria o significado de dados historicos.'
+    default: LOCAL
+    razao_do_default: conservador. Subdeclarar alcance e erro de completude, detectavel e corrigivel.
+      Superdeclarar e erro de integridade de autoridade.
+    aplicacao_do_default: na NORMALIZACAO, nunca no schema — assim o servidor distingue "nao informado"
+      de "informado como LOCAL"
+    vocabulario_rejeitado:
+      planetary:
+        decisao: SINONIMO DE GLOBAL
+        data: '2026-08-29'
+        evidencia: 18 usos em scope, todos em waves 78 e 79. Nenhum arquivo que usa planetary usa tambem
+          continental ou global — foi escolhido como o degrau mais alto disponivel antes de a escala existir.
+        acao: scale NUNCA aceita planetary; os sites emitem scale=GLOBAL
+    invariante_de_propagacao:
+      id: ESCALA_NAO_SOBE_SILENCIOSAMENTE
+      regra: um fato derivado NAO pode ter scale maior que o do fato de origem, exceto por AGREGACAO explicita
+      derivacao_simples: scale <= scale do causation_id
+      agregacao: 'scale PODE subir; exige campo declarando as origens (ex.: source_exposure_ids do contrato
+        continental do CEA)'
+      descida: sempre permitida — restringir alcance nunca amplia autoridade
+      razao: evidencia LOCAL virando recomendacao CONTINENTAL sem agregacao e ampliacao de autoridade
+        sem base — mesma classe da decisao fabricada, no eixo da escala em vez do eixo do dominio
+    relacao_com_scope:
+      scope: campo distinto, string livre, carrega escopo tecnico (session, user, module)
+      regra: NUNCA inferir scale de scope, nem scope de scale
+      eventos_historicos: 'scale = null. NAO inferir de scope: "global" por default nunca significou global,
+        significou nao informado.'
+  federation_cognition:
+    procedencia: '[DECIDIDO 2026-08-30] sintese funcional do ecossistema'
+    principio: a cognicao do LICEU tem DUAS CAMADAS. JOHNs locais interpretam cada dominio; o JOHN central
+      fecha a inteligencia conjunta.
+    camada_local:
+      nome: JOHN local
+      quem: cada monolito com may_decide nao vazio
+      o_que_faz: interpreta o proprio dominio dentro do proprio may_decide. Produz conclusao de dominio,
+        nao recomendacao federativa.
+      exemplos:
+        liceu.bim: solucao_tecnica, viabilidade_de_engenharia
+        liceu.cea: estrutura_de_capital, viabilidade_financeira
+        liceu.archimedes: alternativas_territoriais, ranking_de_candidatos
+      LEGITIMO: true
+      nota: o que antes foi classificado como cognicao usurpada no BIM, GAME MKT, CEA e ARCHIMEDES e JOHN
+        local operando dentro do mandato. Faltava o nome, nao o direito.
+    camada_central:
+      nome: JOHN central
+      quem: liceu.john
+      o_que_faz: COMPARA as interpretacoes locais entre dominios e fecha a inteligencia conjunta. Produz
+        recomendacao federativa com alternativas, justificativa e confianca.
+      may_decide:
+      - recomendacoes
+      - comparacao_de_alternativas
+      jamais: autoridade final — isso e do liceu.anchor
+    REGRA_DE_IDENTIDADE:
+      id: JOHN_LOCAL_NAO_EMITE_IDENTIDADE_DO_CENTRAL
+      texto: interpretar o proprio dominio e legitimo. Emitir a identidade do JOHN central nao e.
+      proibido_ao_JOHN_local:
+      - gerar decision_id — pertence ao liceu.john
+      - declarar origin, source ou source_system como "john", "john_monolito" ou variante
+      - publicar evento no namespace john.*
+      permitido_ao_JOHN_local:
+      - 'produzir conclusao no proprio namespace (ex.: bim.solucao.tecnica)'
+      - 'usar identificador proprio (ex.: assessment_id, analysis_id)'
+      - 'declarar source_system com namespace proprio (ex.: john-pd-lab)'
+      razao: sem essa linha, duas camadas cognitivas se confundem e a cadeia causal nao distingue interpretacao
+        de dominio de recomendacao federativa
+      medicao_atual:
+        geracoes_de_campo_alheio_em_producao: 44
+        reivindicacoes_de_identidade: 24
+        fonte: JOHN_T3_RESCAN
+      aplica_a: os 15 JOHNs locais, sem excecao
+      independe_do_teto: um JOHN local com teto zero tambem nao pode emitir a identidade do central. Teto
+        define o QUE pode decidir; a regra de identidade define COMO assina.
+    monolitos_sem_camada_cognitiva:
+      REVISADO: '[2026-08-30] esta chave estava errada'
+      o_que_dizia: cefeida, anchor, opera, hub e academia nao teriam camada cognitiva
+      realidade: todos tem JOHN local. may_decide=[] significa TETO ZERO, nao ausencia de cognicao.
+      leitura_correta: ver interpretacao_de_may_decide
+    REGRA_UNIVERSAL:
+      procedencia: '[DECIDIDO 2026-08-30]'
+      texto: TODO monolito tem o seu JOHN local, com autonomia limitada por um teto estabelecido pela
+        Mae LICEU. Acima do teto, a Mae decide.
+      sem_excecao: true
+      o_que_isso_revisa: 'a versao 1.6.0 dizia que 5 monolitos nao tinham camada cognitiva. Errado: todos
+        tem. O que varia e o TETO.'
+    interpretacao_de_may_decide:
+      may_decide_nao_vazio:
+        significa: teto maior que zero
+        efeito: o JOHN local decide sozinho dentro do escopo listado, ate o limite quantitativo que a
+          Mae estabelecer
+        quem:
+        - core
+        - archimedes
+        - john
+        - bim
+        - fornecedores
+        - econotech
+        - cea
+        - juridicotech
+        - gamemkt
+        - ped
+      may_decide_vazio:
+        significa: TETO ZERO
+        efeito: o JOHN local INTERPRETA o proprio dominio mas nao decide sozinho. Toda decisao escala
+          para a Mae.
+        quem:
+        - cefeida
+        - anchor
+        - opera
+        - hub
+        - academia
+        NAO_significa: ausencia de JOHN local nem proibicao de interpretar
+        CONSEQUENCIA_A_AVALIAR: a Mae passa a ser ponto unico no caminho decisorio desses cinco. Se ela
+          nao responde, eles nao decidem nada — ou o fallback os libera integralmente, que e pior.
+  federation_authority:
+    procedencia: '[DECIDIDO 2026-08-30] esclarecimento do dono sobre a arquitetura decisoria'
+    principio: a autoridade e DELEGADA COM TETO, nao exclusiva. Cada monolito decide ate um limite estabelecido
+      pela Mae LICEU; acima dele, a Mae decide com apoio da cognicao dos JOHNs.
+    camadas:
+    - ordem: 1
+      nome: JOHN local
+      o_que_faz: interpreta o proprio dominio
+      limite: may_decide do proprio monolito
+    - ordem: 2
+      nome: JOHN central (liceu.john)
+      o_que_faz: compara interpretacoes locais e fecha a inteligencia conjunta
+      limite: recomendacao — jamais autoridade final
+    - ordem: 3
+      nome: Mae LICEU
+      o_que_faz: AUTORIZA e estabelece os limites
+      limite: autoridade de ultima instancia
+    - ordem: 4
+      nome: HUMANO
+      o_que_faz: decide quando a Mae esta indisponivel
+      limite: ultima instancia real
+    delegacao:
+      regra: a Mae estabelece, para cada monolito, o teto ate onde ele pode decidir e autorizar sozinho
+      dentro_do_teto: o monolito decide e emite o proprio fato autoritativo
+      acima_do_teto: ESCALA para a Mae. A Mae decide usando a cognicao dos JOHNs como insumo, nao como
+        decisao.
+      exemplo: o JOHN do ANCHOR promove a estado autorizado dentro do teto. Acima dele, quem promove e
+        a Mae.
+      universalidade: o modelo vale para os 15 monolitos igualmente. O que muda entre eles e o valor do
+        teto, nao a existencia dele.
+    anchor:
+      papel: guardiao de ciclo de vida do que foi autorizado
+      NAO_e: autoridade de governanca de ultima instancia
+      may_authorize_atual:
+      - promocao_a_estado_autorizado
+      - revogacao
+      - supersessao
+      leitura: essas tres capacidades sao DELEGADAS pela Mae, com teto. Manter, renovar e aposentar sao
+        operacoes de ciclo de vida.
+      consequencia: anchor.authorization.granted permanece valido para decisoes DENTRO do teto. Acima
+        dele, o fato autoritativo e da Mae.
+    LIMITE_NAO_DEFINIDO:
+      estado: ABERTO
+      o_que_falta: o teto de cada monolito nao esta definido em lugar nenhum canonico
+      no_codigo:
+        campo: autonomy_level
+        onde:
+        - BIM
+        - CORE
+        - FORNECEDORES
+        - OPERA
+        representacoes: 4
+        formas:
+        - float 0.0-1.0
+        - enum AutonomyLevel
+        - int
+        - str
+        problema: quatro representacoes do mesmo conceito; nenhuma canonica
+      dimensoes_possiveis:
+      - escala (scale)
+      - valor financeiro
+      - risco
+      - reversibilidade
+      - efeito externo
+      decisao_requerida: true
+    FALLBACK:
+      REVISADO: '[DECIDIDO 2026-08-30]'
+      regra: se a Mae ATIVA nao responde, a SUCESSORA assume. Se as duas nao respondem, a pergunta e direcionada
+        ao HUMANO. O JOHN local NAO amplia a propria autonomia em nenhum dos casos.
+      principio: 'fail-closed para humano. Coerente com P04: MISSING AUTHORITATIVE INPUT -> BLOCKED, e
+        BLOCKED aqui significa ESCALAR, nao parar em silencio.'
+      o_que_substitui: 'mother_client atual: ''se LICEU nao responde, john continua operacional'', timeout
+        2.5s. Esse comportamento AMPLIA autonomia na indisponibilidade e deve ser removido.'
+      REQUISITO_NOVO:
+        id: DOSSIE_DE_DECISAO
+        texto: ao escalar para o humano, o ecossistema DEVE reunir informacao suficiente para uma boa
+          decisao
+        nao_e_opcional: true
+        razao: escalar sem contexto transfere o problema, nao a decisao. O humano sem dossie decide pior
+          que o JOHN local.
+        composicao:
+          o_que_se_sabe: cefeida.evidence.published — evidence_refs, confidence, method_version
+          onde_e_por_que: archimedes.planning.state — candidates com where e why
+          quais_alternativas: john.recommendation.generated — alternatives, rationale, confidence
+          o_que_a_lei_permite: legal_basis_refs do contrato de autorizacao
+          quanto_custa: cea.financial.exposure — npv, financial_viability, scenarios
+          qual_o_alcance: scale
+          toca_o_mundo: external_effect da capacidade envolvida
+          de_onde_veio: causation_id e a cadeia de lineage
+        OBSERVACAO: o dossie NAO exige mecanismo novo. A cadeia causal E o dossie. Os oito itens ja estao
+          definidos em contratos e registries.
+        CONSEQUENCIA_DURA: a cadeia causal e 0/5. Se a Mae cair hoje, o ecossistema NAO consegue montar
+          o dossie — o humano recebe nada.
+        inversao_de_prioridade: a cadeia causal deixa de ser objetivo de maturidade e passa a ser requisito
+          de CONTINGENCIA. Sem ela nao ha escalonamento util.
+      comportamento_por_teto:
+        teto_positivo: decide dentro do teto; acima escala para a Mae; sem Mae, humano
+        teto_zero: nao decide; escala sempre; sem Mae, humano
+        invariante: em nenhum caso a indisponibilidade da Mae AMPLIA autonomia local
+    MAE_REDUNDANTE:
+      procedencia: '[DECIDIDO 2026-08-30] duas Maes; humano so quando as duas caem'
+      topologia: ATIVA-PASSIVA com epoca de autoridade
+      razao_de_nao_ser_ativa_ativa: 'duas Maes autorizando ao mesmo tempo viola P01: ONE AUTHORITATIVE
+        STATE -> ONE DOMAIN OWNER. Num sistema comum, split-brain gera dado inconsistente; aqui gera DUAS
+        AUTORIDADES — o invariante central do ecossistema quebrado pelo proprio mecanismo de disponibilidade.'
+      cadeia_de_escalonamento:
+      - JOHN local dentro do teto
+      - Mae ATIVA
+      - Mae SUCESSORA, promovida com concordancia da TESTEMUNHA
+      - HUMANO, acionado pela TESTEMUNHA quando as duas Maes de autoridade caem
+      AUTHORITY_EPOCH:
+        id: EPOCA_DE_AUTORIDADE
+        o_que_e: inteiro monotonico, incrementado a cada promocao de Mae
+        onde_vive: campo do envelope em fato autoritativo
+        regra: o Event Store REJEITA fato autoritativo com epoca MENOR que a maior ja observada
+        efeito: uma Mae que perdeu a ativacao e nao percebeu continua emitindo com epoca antiga. Os fatos
+          dela sao rejeitados na fronteira, nao aceitos e reconciliados depois.
+        por_que_funciona_com_apenas_duas: nao exige quorum. A monotonicidade da epoca e arbitrada pelo
+          Event Store, que ja e ponto de serializacao.
+        precedente_interno: 'mesma familia do conflict_token e do chain_expires_at: valor verificavel
+          que torna a violacao detectavel em vez de silenciosa'
+        NAO_resolve: nao impede a Mae antiga de TENTAR. Impede que a tentativa vire fato.
+      promocao:
+        planejada:
+          gatilho: manutencao
+          modo: MANUAL
+          sequencia:
+          - 1. Mae A para de aceitar novas decisoes
+          - 2. Mae A drena o que esta em curso
+          - 3. epoca incrementa e Mae B assume
+          - 4. Mae A entra em manutencao
+          risco_de_split_brain: NENHUM — a saida e ordenada
+          e_o_caso_de_uso_pedido: trabalhar em uma enquanto a outra toca o ecossistema
+        nao_planejada:
+          gatilho: queda da ativa
+          modo: A DEFINIR
+          risco: automatica e mais rapida e pode promover B enquanto A ainda vive e nao sabe. A epoca
+            torna isso detectavel, nao impossivel.
+          decisao_requerida: true
+      o_que_a_Mae_SUCESSORA_precisa:
+        estado_replicado:
+        - os tetos de cada monolito
+        - decisoes em curso e escalonamentos pendentes
+        - a epoca atual
+        ATENCAO: os tetos ainda NAO existem canonicamente. Replicar estado que nao esta definido nao e
+          possivel — ver LIMITE_NAO_DEFINIDO.
+        consequencia: a dupla Mae depende de o teto ser definido primeiro
+      HUMANO:
+        quando: as DUAS Maes indisponiveis
+        inalterado: o requisito DOSSIE_DE_DECISAO permanece
+      TESTEMUNHA:
+        procedencia: '[DECIDIDO 2026-08-30] terceira Mae que so informa'
+        nome: Mae TESTEMUNHA
+        topologia_resultante: duas Maes de autoridade (ativa e sucessora) + uma testemunha
+        PROIBICAO_ABSOLUTA:
+          texto: a TESTEMUNHA NUNCA autoriza.
+          razao: se puder autorizar, e uma terceira autoridade e o P01 volta a ser violado — agora com
+            tres em vez de duas. A testemunha existe para PROTEGER o P01, nao para participar dele.
+          proibido:
+          - emitir fato autoritativo
+          - incrementar a propria epoca
+          - estabelecer teto
+          - decidir escalonamento
+          - substituir Mae ativa ou sucessora
+          permitido:
+          - observar o estado das duas Maes de autoridade
+          - arbitrar qual delas e a ATIVA
+          - declarar que ambas estao indisponiveis
+          - reunir e apresentar o DOSSIE_DE_DECISAO ao humano
+        o_que_resolve:
+          quorum: com 3 participantes ha maioria. A arbitragem deixa de depender de timeout unilateral.
+          split_brain: a promocao passa a exigir concordancia da testemunha. Uma Mae nao se promove sozinha.
+          MR5_deteccao_de_dupla_queda: a testemunha e quem declara que as duas cairam. Resolve o problema
+            de nao haver autoridade para declarar ausencia de autoridade.
+          dossie: por so informar, a testemunha e o lugar natural para montar o DOSSIE_DE_DECISAO quando
+            o humano e acionado
+        o_que_NAO_resolve:
+          queda_da_testemunha: se a testemunha cair, volta ao cenario de duas — sem quorum. O authority_epoch
+            permanece como rede de seguranca.
+          regra: a testemunha e camada de PROTECAO, nao de disponibilidade. Sua queda nao para o ecossistema;
+            apenas remove a arbitragem.
+          dupla_falha: 'testemunha + ativa fora ao mesmo tempo: a sucessora nao tem com quem confirmar.
+            DECISAO REQUERIDA — promove sob incerteza ou escala ao humano.'
+        posicionamento:
+          requisito: dominio de falha distinto das duas Maes de autoridade
+          razao: se as tres compartilham infraestrutura, a testemunha nao acrescenta independencia — apenas
+            custo
+          peso: leve — so observa, nao processa decisao
+        relacao_com_authority_epoch:
+          permanecem_juntos: true
+          testemunha: PREVINE a promocao indevida
+          authority_epoch: CONTEM o dano se a prevencao falhar
+          razao: duas camadas independentes. A testemunha pode cair; a epoca nao depende dela para funcionar.
+      queda_da_testemunha:
+        procedencia: '[RATIFICADO 2026-09-01] resolucao de D-040'
+        testemunha_cai_e_ativa_saudavel:
+          operacao_normal: CONTINUA
+          promocao_automatica: PROIBIDA
+          epoca: permanece vigente
+          estado: PROTECAO
+          acao: recuperar a testemunha
+        ativa_e_testemunha_caem_juntas:
+          sucessora_se_promove_sozinha: false
+          decisoes_acima_do_teto: BLOCKED
+          operacoes_ja_autorizadas_e_seguras: CONTINUAM
+          humano: acionado para autorizar a promocao ou decidir a contingencia
+    CLASSE_DE_AUTORIDADE:
+      procedencia: '[RATIFICADO 2026-09-01] resolucao de D-037'
+      producer_id: liceu.authority
+      producer_kind: AUTHORITY_CONTROL_PLANE
+      NAO_e: o 16o monolito soberano. Os 15 continuam sendo os produtores soberanos dos respectivos dominios.
+      nao_possui:
+      - engenharia
+      - capital
+      - territorio
+      - direito
+      - execucao
+      - qualquer estado de dominio
+      produz_exclusivamente: fatos de autoridade e governanca federativa
+      instancias:
+      - mother-a
+      - mother-b
+      - mother-witness
+      campos_obrigatorios:
+      - producer_id
+      - producer_instance_id
+      - authority_role
+      - authority_epoch
+      - authority_issuer_id
+      - activation_certificate_id
+      papeis:
+        ACTIVE: autoriza decisoes que ultrapassam o teto delegado dos monolitos
+        SUCCESSOR: mantem estado replicado; so autoriza apos promocao valida
+        WITNESS: observa, atesta, confirma promocao, detecta dupla queda e monta o dossie
+        PROIBICAO_DA_TESTEMUNHA: nunca autoriza, nunca estabelece teto, nunca assume o papel da Mae ativa
+      REGRA_DE_ORIGEM_DO_PAPEL: o papel deve ser derivado da identidade AUTENTICADA da instancia, NUNCA
+        de campo autodeclarado no payload
+      ACEITACAO_NO_EVENT_STORE:
+        condicoes:
+        - producer_id == liceu.authority
+        - authority_role == ACTIVE
+        - authority_epoch == epoca vigente
+        - authority_issuer_id == emissor ativo daquela epoca
+        - activation_certificate_id valido
+        rejeicao: uma antiga Mae ativa tentando publicar apos a promocao da sucessora deve ser REJEITADA,
+          mesmo que continue online
+    MODO_DEGRADADO:
+      procedencia: '[RATIFICADO 2026-09-01] principio de autonomia segura'
+      principio: o LICEU nao para integralmente diante de falha de autoridade
+      CONTINUA:
+      - operacoes ja autorizadas
+      - acoes locais
+      - acoes reversiveis
+      - observacao
+      - coleta de evidencias
+      - auditoria
+      - monitoramento
+      - preservacao de estado
+      - recuperacao automatica
+      BLOQUEIA:
+      - nova acao acima do teto
+      - acao irreversivel
+      - acao com alto efeito externo
+      - ampliacao silenciosa de escala
+      - decisao sem evidencia
+      - promocao de autoridade sem atestado
+      - execucao que exija autorizacao inexistente
+      consequencia: o humano e a ultima instancia, nao o operador permanente
+    POSICAO_DO_HUMANO:
+      procedencia: '[RATIFICADO 2026-09-01]'
+      principio: o LICEU opera autonomamente dentro dos contratos, capacidades, tetos, escalas e politicas
+        constitucionais
+      o_humano_NAO_participa_de:
+      - fluxo normal
+      - decisao acima do teto enquanto a Mae ativa estiver saudavel
+      - promocao da sucessora com testemunha presente
+      o_humano_entra_quando:
+      - falha das autoridades automaticas
+      - conflito nao resolvido
+      - ausencia de evidencia suficiente
+      - risco que ultrapasse os limites constitucionais
+      formulacao: nao e retirar o humano do ecossistema. E posiciona-lo fora do caminho normal e dentro
+        do caminho formal de contingencia.
+    G6:
+      procedencia: '[RATIFICADO 2026-09-01] resolucao de D-039'
+      obrigatorio_antes_de: qualquer declaracao de PASS continental
+      enquanto_nao_existir:
+      - BLOCKED
+      - NOT_VERIFIABLE
+      PROIBIDO: PASS_PARTIAL
+      nao_pode_haver:
+      - certificacao continental
+      - dados reais
+      - execucao fisica real
+      - promocao para producao
+      - declaracao de cadeia causal aprovada
+      casos_minimos:
+      - operacao autonoma dentro do teto
+      - escalonamento acima do teto
+      - autorizacao pela Mae ativa
+      - queda da Mae ativa
+      - promocao da sucessora com concordancia da testemunha
+      - incremento de authority_epoch
+      - rejeicao da antiga Mae ativa
+      - proibicao absoluta da testemunha autorizar
+      - queda das duas Maes de autoridade
+      - montagem do dossie pela testemunha
+      - decisao humana com lineage
+      - retomada da execucao
+      - replay completo
+      - auditoria imutavel
+      - comportamento fail-closed
+    DECISAO_HUMANA:
+      procedencia: '[CORRIGIDO 2026-09-01] parecer executivo, lacuna 2'
+      NATUREZA: RAMIFICACAO DE CONTINGENCIA
+      NAO_E: sexto elo da cadeia normal
+      erro_corrigido: posicao_na_cadeia 6 colocava a decisao humana DEPOIS da execucao do OPERA
+      fluxo_correto:
+      - ARCHIMEDES
+      - CEFEIDA
+      - JOHN
+      - '[falha das Maes]'
+      - decisao humana
+      - registro de autorizacao / ciclo de vida
+      - OPERA
+      entra_antes_de:
+      - autorizacao final
+      - execucao
+      escalation_reason:
+        obrigatorio: true
+        valores:
+        - MOTHERS_UNAVAILABLE
+        - UNRESOLVED_CONFLICT
+        - INSUFFICIENT_EVIDENCE
+        - CONSTITUTIONAL_RISK_LIMIT
+        - MANUAL_EMERGENCY
+        razao: a Constituicao permite intervencao humana por conflito nao resolvido, evidencia insuficiente
+          e risco constitucional — casos em que as Maes PODEM estar disponiveis. maes_indisponiveis nao
+          pode ser sempre obrigatorio.
+      AUTENTICACAO_HUMANA:
+        obrigatoria: true
+        campos:
+        - human_signature
+        - human_authentication_method
+        - mfa_assertion_hash
+        - signed_at
+        - nonce
+        - witness_attestation
+        REGRA_DA_TESTEMUNHA: a testemunha pode REGISTRAR uma decisao humana assinada, apos verificar assinatura
+          e autenticacao. NAO pode CRIA-LA.
+        bloqueio_que_isso_fecha: WITNESS_WITH_EMPTY_AUTH_ACCEPTED
+  camadas_transversais:
+    procedencia: '[DECIDIDO 2026-09-01] Sintese constitucional, secoes 10 e 11'
+    REGRA_UNICA:
+      id: NENHUMA_CAMADA_TRANSVERSAL_GOVERNA_DOMINIO
+      texto: as camadas transversais servem os 15 monolitos. Nenhuma exerce autoridade sobre dominio,
+        decide merito ou substitui produtor.
+      e_a_mesma_regra_da: Mae TESTEMUNHA — servir sem participar da autoridade
+      verificavel: nenhuma camada tem producer_id de fato autoritativo nem entra na cadeia causal
+    camadas:
+    - nome: Platform Engineering
+      escopo:
+      - IDP
+      - templates
+      - SDK comum
+      - golden paths
+      - CI/CD
+      - contract testing
+      - catalogo
+      - automacao de releases
+      - politicas de repositorio
+      limite: facilita o desenvolvimento; nao governa os dominios
+    - nome: Runtime Mesh
+      escopo:
+      - service mesh
+      - event mesh
+      - orchestration mesh
+      - AI mesh
+      - retries
+      - outbox
+      - replay
+      - health
+      - self-healing
+      limite: transporta e recupera; nao decide conteudo
+    - nome: Security
+      escopo:
+      - IAM global
+      - identidade por produtor e instancia
+      - zero trust
+      - policy enforcement
+      - secrets federation
+      - MFA
+      - rate limiting
+      - WAF
+      - auditabilidade
+      - protecao de supply chain
+      limite: aplica controles tecnicos. A admissibilidade LEGAL e do liceu.legal — Security bloqueia
+        tecnicamente, nao julga direito.
+    - nome: Data
+      escopo:
+      - Data Fabric
+      - Lakehouse
+      - streaming
+      - lineage
+      - catalogo
+      - semantic layer
+      - qualidade
+      - soberania por dominio
+      - DNA Storage Engine
+      limite: conecta verdades; NAO centraliza a posse. O estado interno continua pertencendo ao monolito
+        soberano.
+    - nome: Inteligencia Artificial
+      escopo:
+      - MLOps
+      - model registry
+      - model governance
+      - inference runtime
+      - memoria
+      - vector runtime
+      - avaliacao
+      - explicabilidade
+      - drift
+      - shadow mode
+      - safety mode
+      limite: serve a cognicao; nao e cognicao com autoridade
+      brain_lib_e_motores_compartilhados:
+        devem_ser: PUROS
+        proibido:
+        - banco proprio
+        - estado soberano
+        - side effects
+        - execucao fisica
+        - autoridade
+        nota: unico principio que o codigo cumpre integralmente hoje
+    - nome: FinOps
+      escopo:
+      - custo por monolito
+      - por tenant
+      - por runtime
+      - por evento
+      - por modelo
+      - de inferencia
+      - orcamento e alertas
+      limite: mede custo de cloud, runtime e IA. NAO substitui ECONOTECH na economia sistemica nem CEA
+        no capital.
+    modulos_estrategicos:
+    - nome: LICEU Data Fabric / DNA Storage Engine
+      e: infraestrutura de dados e memoria federativa
+      NAO_e: banco unico de todos os monolitos
+    - nome: LICEU Command Center / JOHN Command Grid
+      e: observabilidade, acompanhamento e explicacao
+      faz:
+      - mostra estado
+      - reune metricas
+      - apresenta causalidade
+      - exibe riscos
+      - acompanha escalonamentos
+      NAO_e: nova autoridade
+    - nome: LICEU Shield / JOHN Cyber Defense
+      e: defesa cibernetica
+      faz:
+      - deteccao
+      - resposta
+      - trust
+      - policy
+      - protecao de identidade
+      - analise de ameaca
+      - auditabilidade
+      limite: pode bloquear tecnicamente uma violacao; NAO decide o merito economico, juridico ou operacional
+        do dominio
+  core_dna:
+    procedencia: '[DECIDIDO 2026-09-01] Sintese constitucional, secao 6'
+    e: fonte unica de verdade SEMANTICA e CONTRATUAL da federacao
+    define:
+    - identidades canonicas
+    - produtores
+    - capacidades
+    - contratos
+    - versoes
+    - schemas
+    - envelopes
+    - eventos
+    - regras de compatibilidade
+    - escalas
+    - lineage
+    - campos de autoridade
+    - politicas de evolucao
+    REGRA: todo dado que ATRAVESSA FRONTEIRAS obedece ao CORE-DNA; o estado interno continua pertencendo
+      ao monolito soberano
+    NAO_significa: que todo dado de negocio deve morar no banco do CORE
+    exemplos:
+      financeiro detalhado: liceu.cea
+      modelos tecnicos: liceu.bim
+      evidencias: liceu.cefeida
+      contratos juridicos: liceu.legal
+      fatos canonicos federativos: Event Store do liceu.core
+    extracao_fisica_do_kernel:
+      depende_de: ADR-001
+      estado: ABERTA
+    fronteira_semantica:
+      estado: JA OBRIGATORIA
+      nao_depende_da_ADR_001: true
+  identidade_semantica_de_replay:
+    procedencia: '[RATIFICADO 2026-09-01] parecer, onda 3'
+    funcao: same_event
+    campos:
+    - event_id (global)
+    - producer_id autenticado
+    - event_type
+    - contract_id
+    - contract_version
+    - payload canonico
+    - payload_hash verificado
+    - envelope_fingerprint
+    - artifact_id
+    - scale
+    - lineage aplicavel
+    - autoridade aplicavel
+    total: 12
+    regra: replay legitimo exige igualdade de TODOS
+    qualquer_divergencia:
+    - HTTP 409
+    - conflict_token
+    - auditoria completa
+    - nenhuma exposicao do payload armazenado
+    corrige: a referencia usava 9 campos — payload divergente passava como replay
+  verificacao_de_hash:
+    procedencia: '[RATIFICADO 2026-09-01]'
+    servidor_deve:
+    - preservar o hash declarado pelo produtor
+    - calcular um hash de verificacao
+    - comparar os valores
+    - rejeitar ou marcar invalida a divergencia
+    servidor_NUNCA:
+    - corrigir silenciosamente
+    - aceitar silenciosamente hash incorreto
+    reverte_parcialmente: E1T6 — mantem nunca corrigir, acrescenta nunca aceitar em silencio
+  event_id_scope:
+    procedencia: '[RATIFICADO 2026-09-01] reverte D-035'
+    regra: event_id GLOBALMENTE unico
+    mesma_identidade_por_outro_produtor: 409 e auditoria
+    efeito: o modo SELF da colisao perde sentido; o modo FOREIGN e o unico e o bloqueio SELF_MODE_NOT_SAFE
+      some
+  campos_exigidos_pelo_protocolo:
+    ATENCAO: esta chave descreve o que o protocolo EXIGE. O CORE ainda NAO os aceita — ver campos_aceitos_pelo_servidor.
+    campos:
+    - producer_id
+    - payload_hash
+    - envelope_fingerprint
+    - observed_at
+    - emitted_at
+    - scale
+    - producer_instance_id
+    - authority_role
+    - authority_epoch
+    - authority_issuer_id
+    - activation_certificate_id
+    total: 11
+    implementation_status: NAO_INICIADA
+    razao_da_separacao: requisito futuro nao pode ser rotulado como evidencia de codigo existente
+monolitos:
+  core:
+    canonical_name: LICEU CORE
+    repository: LICEU_6.0_CONSTRUTORA_VIRTUAL
+    authority_class: Constitution Plane
+    wave: W88
+    mission: Identidade, contratos, event fabric, lineage, replay, trust
+    may_decide:
+    - contratos_validos
+    - identidades_validas
+    may_authorize:
+    - emissao_de_identidade_de_servico
+    may_execute:
+    - event_store
+    - contract_registry
+    state_ownership:
+    - immutable_events
+    - core_dna_contracts
+    - service_identities
+    forbidden:
+    - label: engenharia/BIM
+      pattern: (construction/|engenharia|arquitetura\.py|bim_engine|viabilidade)
+      violacao: '[CODIGO] 114 arquivos de dominio de engenharia e obra'
+    - label: planejamento territorial
+      pattern: (territorial|planning_engine|where_to_build)
+    - label: procurement
+      pattern: (procurement|/supplier|fornecedor)
+    fronteira_fisica:
+      procedencia: '[DECIDIDO 2026-08-29]'
+      P1_07A_fronteira_semantica: APROVADA — imediata
+      P1_07B_extracao_fisica: ADR_REQUIRED — nao executar antes da ADR
+      core_somente:
+      - identity
+      - contracts
+      - federation event fabric
+      - service identities
+      - trust
+      - lineage
+      - replay
+      - technical federation policy
+      core_nunca:
+      - engineering
+      - construction
+      - procurement
+      - territorial planning
+      - finance
+      - legal
+      - market
+      razao_da_adr: W88 certificado; extracao toca migrations, auth, Event Store, Codespaces e lineage
+  archimedes:
+    canonical_name: ARCHIMEDES
+    repository: Archimedes-ImobTech-LICEU-6.0-
+    authority_class: Perception Plane
+    wave: W89
+    mission: WHERE_TO_BUILD / WHY_TO_BUILD — autoridade territorial
+    may_decide:
+    - alternativas_territoriais
+    - ranking_de_candidatos
+    may_authorize:
+    - promocao_dos_proprios_estados_de_planejamento
+    may_execute: []
+    state_ownership:
+    - archimedes_root_states
+    forbidden:
+    - label: BIM executivo
+      pattern: (bim_model|ifc_export|projeto_executivo)
+    - label: BOQ/WBS executivo
+      pattern: (\bboq\b|\bwbs\b)
+    - label: aprovacao financeira/juridica
+      pattern: (legal_approval|aprovacao_financeira)
+    observacao_positiva: '[CERT] Unico com authority boundary implementado em codigo (W89B3)'
+    divida_conhecida:
+    - '[CODIGO] emite campo `contract` inexistente no schema'
+    - '[CODIGO] nao emite artifact_id, procurado por CEA e ECONOTECH'
+    - '[CODIGO] aceita aliases de variavel que nenhum outro monolito reconhece'
+  cefeida:
+    canonical_name: CEFEIDA / 3C273
+    repository: 3C273-Analytics-Data-Science
+    authority_class: Perception Plane
+    wave: W90
+    mission: Evidencia quantitativa e observabilidade
+    may_decide: []
+    may_authorize: []
+    may_execute:
+    - ingestao
+    - metricas
+    - forecast
+    forbidden:
+    - label: motor de decisao
+      pattern: (decision_engine|john_decision)
+      violacao: '[CODIGO] cefeida/backend/modules/john_decision_engine.py'
+    - label: autorizacao
+      pattern: (authoriz|approval_engine)
+    dependencia_quebrada:
+      procedencia: '[CODIGO]'
+      descricao: 'john/backend/wave91_canonical_decision_gate.py exige evento W90 com producer == "CEFEIDA"
+        e levanta ContractError sem ele. CEFEIDA nao publica no store canonico. A cadeia evidencia ->
+        decisao nao fecha.
+
+        '
+  john:
+    canonical_name: JOHN BRASILEIRO
+    repository: John-Brasileiro-
+    authority_class: Cognition Plane
+    wave: W91
+    mission: Recomendacao e decisao cognitiva — jamais autoridade final
+    may_decide:
+    - recomendacoes
+    - comparacao_de_alternativas
+    may_authorize: []
+    may_execute: []
+    forbidden:
+    - label: autoexecucao/autoaprovacao
+      pattern: (self_approv|auto_authoriz|self_authoriz)
+    observacao_positiva: '[CODIGO] Unico dos 15 que monta o envelope canonico corretamente (contract_id
+      + contract_version + artifact_id). 119 arquivos de teste, o maior do ecossistema. Usa SealedSecret.
+
+      '
+    correcao_de_registro:
+      procedencia: '[CODIGO]'
+      descricao: 'O gate W88A2 registrou JOH_BRASILEIRO_DB_COUPLING=DIRECT_DB_COUPLING e isso se propagou
+        por 3 documentos. Inspecao direta NAO encontrou referencia a liceu_core_os, events_store ou FROM
+        public.events em Python no JOHN. O acoplamento direto verificado e do BIM. ACAO: decompor o gate
+        W88A2, como a §30 do handoff propoe para W89_PROVENANCE_PRESENT. Nao alterar o gate sem nova evidencia.
+
+        '
+  anchor:
+    canonical_name: ANCHOR
+    repository: ANCHOR.OS-LICEU6.0
+    authority_class: Authority Plane
+    wave: W92
+    mission: Guardiao de ciclo de vida do que foi autorizado
+    may_decide: []
+    may_authorize:
+    - promocao_a_estado_autorizado
+    - revogacao
+    - supersessao
+    may_execute: []
+    forbidden:
+    - label: execucao de dominio tecnico
+      pattern: (maintenance_service|asset_service|/precon)
+      violacao: '[CODIGO] app/anchor/services/{maintenance,asset}_service.py, precon/'
+    papel:
+      procedencia: '[DECIDIDO 2026-08-29]'
+      destino: Governance / Authorization Fabric
+      pode:
+      - validate policy
+      - evaluate competence
+      - evaluate evidence sufficiency
+      - grant authorization
+      - deny authorization
+      - revoke
+      - supersede
+      nao_pode:
+      - perform maintenance
+      - execute assets
+      - engineer assets
+      - operate projects
+      - self-execute what it authorized
+      destino_do_codigo_de_manutencao:
+        nota: CLASSIFICAR antes de mover. Nao mover automaticamente.
+        manutencao_tecnica: bim
+        manutencao_operacional: opera
+        manutencao_de_fornecedor: fornecedores
+    mission_anterior: Legitimar ou rejeitar — autoridade de governanca
+    nota_de_revisao: '[2026-08-30] a autoridade de ultima instancia e da Mae LICEU. O ANCHOR exerce may_authorize
+      DELEGADO, com teto, e cuida do ciclo de vida do que foi autorizado.'
+    fronteira_de_continuidade:
+      procedencia: '[DECIDIDO 2026-09-01] Sintese constitucional, secao 5'
+      governa:
+      - promocao a estado autorizado
+      - revogacao
+      - supersessao
+      - acompanhamento de continuidade do que foi autorizado
+      NAO_executa: manutencao fisica. Trocar peca, refazer obra ou repor suprimento e execucao — pertence
+        a OPERA, BIM e FORNECEDORES.
+      distincao: governar continuidade e acompanhar o estado do autorizado ao longo do tempo. Executar
+        manutencao e agir sobre o ativo fisico.
+      consequencia_de_codigo:
+        achado_reaberto: maintenance_service, asset_service e precon no ANCHOR precisam ser reexaminados
+          com este recorte
+        o_que_muda_em_relacao_a_analise_anterior: 'a analise original dizia "governanca e manutencao coabitando"
+          e propunha mover tudo. Depois foi retirada por inteiro quando o ANCHOR virou guardiao de ciclo
+          de vida. Ambas erraram: a primeira por generalizar, a segunda por retirar demais. O recorte
+          correto e por ATO, nao por modulo — acompanhar fica, agir sobre o ativo sai.'
+        estado: A_REEXAMINAR
+      coerencia_com_external_effect: o ANCHOR tem external_effect 0/3. Se ele executasse manutencao fisica,
+        teria — a classificacao de capacidades ja apontava para esta fronteira antes de ela ser declarada.
+  opera:
+    canonical_name: OPERA
+    repository: OPERA-ES-LICEU-6.0
+    authority_class: Reality Plane
+    wave: W93
+    mission: Converter decisao autorizada em execucao
+    may_decide: []
+    may_authorize: []
+    may_execute:
+    - projetos_operacionais
+    - ordens
+    - estados_de_execucao
+    forbidden:
+    - label: engenharia propria
+      pattern: (bim_model|structural_calc|ifc_parser)
+    - label: autoaprovacao
+      pattern: (self_approv|auto_authoriz)
+    observacao_positiva: '[CODIGO] Unico monolito com codigo que passa limpo no verificador'
+    divida_conhecida:
+    - '[CODIGO] NATS puro; nao le nem escreve no store canonico onde a decisao vive'
+    - '[CODIGO] unico que publica em liceu.events.> — namespace sem outros assinantes'
+  bim:
+    canonical_name: BIM.ARQ.ENG
+    repository: BIM.ARQ.ENG-LICEU-6.0-
+    authority_class: Reality Plane
+    wave: W94
+    mission: Converter necessidade em ativo fisico realizavel
+    may_decide:
+    - solucao_tecnica
+    - viabilidade_de_engenharia
+    may_authorize: []
+    may_execute:
+    - modelos_bim
+    - especificacoes
+    - digital_twin
+    forbidden:
+    - label: financiamento/investidores
+      pattern: (investor|funding|financiamento)
+      violacao: '[CODIGO] routers/investors.py, models/investor.py'
+    - label: regulacao/compliance
+      pattern: (compliance|regulat|juridic)
+      violacao: '[CODIGO] routers/compliance.py, integrations/juridicotech/'
+    violacao_critica:
+      procedencia: '[CODIGO]'
+      arquivo: runtime/bim_arch_eng/wave89a_canonical_resolution_gate.py
+      descricao: 'psycopg2 direto no liceu_core_os com SELECT FROM public.events e fallback para postgresql://postgres:postgres@localhost:5542.
+        Contorna a validacao de lineage que devolve 422 quando referencia upstream nao existe. Parser
+        de URL faz split(":") e split("@") na mao: quebra com senha contendo : ou @.
+
+        '
+    observacao_positiva: '[CERT] Bloqueou corretamente a campanha continental por falta de input autoritativo'
+  fornecedores:
+    canonical_name: FORNECEDORES
+    repository: FORNECEDORES-LICEU-6.0
+    authority_class: Reality Plane
+    wave: W95
+    mission: Quem consegue fornecer o que, quando, com qual risco
+    may_decide:
+    - sourcing
+    - qualificacao_de_fornecedor
+    may_authorize: []
+    may_execute:
+    - procurement
+    - contratacao_no_dominio
+    forbidden:
+    - label: engenharia propria
+      pattern: (structural_calc|calculo_estrutural)
+    - label: politica financeira
+      pattern: (funding_policy|capital_structure)
+    observacao_positiva: '[CODIGO] Cliente canonico fail-closed — referencia para os outros 14'
+    a_verificar:
+    - '[CODIGO] publish_event definido mas sem chamada localizada. Codigo morto?'
+    - '[CODIGO] evento supplier.level.updated: 0 ocorrencias em 15 repositorios'
+  econotech:
+    canonical_name: ECONOTECH
+    repository: ECONO.TECH-LICEU-6.0
+    authority_class: Civilizational Feedback Plane
+    wave: W96
+    mission: Impacto economico e externalidades sistemicas
+    may_decide:
+    - cenarios_economicos
+    - avaliacao_de_impacto
+    may_authorize: []
+    may_execute: []
+    forbidden:
+    - label: capital/investimento (e do CEA)
+      pattern: (national_investment|investment_runtime|treasury|capital_alloc)
+      violacao: '[CODIGO] national_investment_runtime.py, civilization_investment_advisor.py, Treasury.sol'
+    - label: cognicao (e do JOHN)
+      pattern: (/john/|john_econo)
+      violacao: '[CODIGO] app/john/, ai/john_econo.py, backend/app/john/interplanetary_john/'
+    bug_conhecido:
+      procedencia: '[CODIGO]'
+      arquivo: backend/federation/canonical_api.py
+      descricao: 'get_event_by_id normaliza o envelope {"status","item"} em vez do item. _field procura
+        canonical_event_id em metadata/payload, chaves que o envelope nao tem. Retorna sempre None e cai
+        em get_events(limit=2000). Toda busca por ID varre ate 2000 eventos; evento antigo nao e encontrado.
+
+        '
+  cea:
+    canonical_name: CEA INVESTIMENTOS
+    repository: CEA-INVESTIMENTOS--LICEU-6.0-
+    authority_class: Civilizational Feedback Plane
+    wave: W97
+    mission: Capital, funding, exposicao e risco financeiro
+    may_decide:
+    - estrutura_de_capital
+    - viabilidade_financeira
+    may_authorize: []
+    may_execute: []
+    forbidden:
+    - label: compliance juridico (e do JURIDICOTECH)
+      pattern: (compliance_engine|banking_compliance|sovereign_compliance|civilizational_compliance)
+      violacao: '[CODIGO] os 4 diretorios existem'
+    divida_conhecida:
+    - '[CODIGO] contract_version ''1.0.0'' diverge do default ''v1'' do servidor'
+    - '[CODIGO] resolve_event redundante: servidor ja resolve em _resolve_event_identifier'
+    - '[CODIGO] 3 arvores Python paralelas e 3 frontends'
+  juridicotech:
+    canonical_name: JURIDICOTECH
+    repository: JURIDICO-TECH
+    authority_class: Civilizational Feedback Plane
+    wave: W98
+    mission: Admissibilidade juridica e regulatoria
+    may_decide:
+    - constraints_legais
+    - condicoes_de_aprovacao
+    may_authorize:
+    - aprovacao_juridica_no_proprio_dominio
+    may_execute: []
+    forbidden:
+    - label: redesenho tecnico do ativo
+      pattern: (bim_model|structural_calc)
+    - label: viabilidade financeira
+      pattern: (funding_structure|capital_alloc)
+    divida_conhecida:
+    - '[CODIGO] envelope proprio com meta{} aninhado — incompativel com o canonico'
+    - '[CODIGO] signature: ''sha256'' e literal, nao assinatura. Falsa garantia de integridade'
+    - '[CODIGO] frontend/node_modules commitado (2338 arquivos)'
+  gamemkt:
+    canonical_name: GAME MKT
+    repository: GAME-MKT
+    authority_class: Civilizational Feedback Plane
+    wave: P15
+    mission: Adocao, incentivos e tracao
+    may_decide:
+    - hipoteses_de_mercado
+    - estrategia_de_adocao
+    may_authorize: []
+    may_execute: []
+    forbidden:
+    - label: economia/capital
+      pattern: (economic_impact|capital_alloc)
+    - label: cognicao
+      pattern: (decision_engine|john_)
+    violacao_critica:
+      procedencia: '[CODIGO]'
+      arquivo: backend/src/services/nats-event-bus.ts
+      descricao: 'Classe NatsEventBus NAO conecta a NATS: e barramento in-process (Map de handlers + array
+        publishLog). index.ts importa este (linha 68) E o federation real (linha 78). Os 9 eventos de
+        GameMktPublishedEvent, incluindo marketing.attribution.updated que fecha o Attribution Loop de
+        CAC para receita, estao tipados no modulo in-process.
+
+        '
+      a_verificar: Quais rotas usam qual barramento
+    legado:
+      procedencia: '[CODIGO]'
+      descricao: 'Consome archimedes.deal.closed e archimedes.lead.converted — eventos do ARCHIMEDES-como-CRM,
+        definicao superseded. Os contratos correspondentes (crm.proto, deal.closed.v1.schema.json, lead.created.v1.schema.json)
+        seguem vivos em core/core_dna/.
+
+        '
+  hub:
+    canonical_name: HUB BACKOFFICE
+    repository: HUB-BACKOFICE-LICEU-6.0
+    authority_class: Civilizational Feedback Plane
+    wave: W99
+    mission: Read model federado — visao sem posse da verdade
+    may_decide: []
+    may_authorize: []
+    may_execute:
+    - projecoes
+    - dashboards
+    state_ownership: []
+    forbidden:
+    - label: reimplementa outro monolito
+      pattern: ^(archimedes|juridicotech|cefeida|opera|bim|cea)/
+      violacao: '[CODIGO] archimedes/consumer.py, juridicotech/consumer.py'
+    papel:
+      procedencia: '[DECIDIDO 2026-08-29]'
+      destino: Federated Control Tower / Read Model
+      regra: VISIBILITY != OWNERSHIP
+      lema: MAXIMUM VISIBILITY, MINIMUM DOMAIN AUTHORITY
+      pode_enxergar:
+      - territory
+      - evidence
+      - recommendations
+      - authorizations
+      - execution
+      - engineering
+      - suppliers
+      - capital
+      - economics
+      - legal
+      - market
+      - learning
+      nao_e_owner_de: nenhum estado de dominio
+      destino_do_backoffice: 'CLASSIFICAR: financeiro->cea, suprimentos->fornecedores, RH/DP->decisao
+        separada'
+  academia:
+    canonical_name: ACADEMIA DO SABER
+    repository: LICEU-ACADEMIA-DO-SABER-
+    authority_class: Civilizational Feedback Plane
+    wave: W100
+    mission: Transformar experiencia em conhecimento reutilizavel
+    may_decide: []
+    may_authorize: []
+    may_execute:
+    - curricula
+    - playbooks
+    - lessons_learned
+    forbidden:
+    - label: autoridade operacional
+      pattern: (runtime/education/governance/|federation-authority)
+      violacao: '[CODIGO] sovereign_learning_governance.py, educational_policy_runtime.py'
+    dependencia_quebrada:
+      procedencia: '[CODIGO]'
+      descricao: 'topology.ts declara consumo de research.breakthrough, research.material.discovered e
+        research.agi.generated. P&D nao existe como codigo. Consumidor sem produtor. Corrigir em P1 (declaracao),
+        nao em P12 (implementacao do produtor).
+
+        '
+    divida_conhecida:
+    - '[CODIGO] 25 apps declarados, 2 implementados; 23 sao scaffolding de 1 a 3 arquivos'
+    - '[CODIGO] node_modules commitado (1059 arquivos, 7.3 MB)'
+  ped:
+    canonical_name: P&D.IA
+    repository: P-D-LICEU-6.0
+    authority_class: Civilizational Feedback Plane
+    wave: transversal
+    mission: Investigar o que o ecossistema ainda nao sabe resolver
+    may_decide:
+    - hipoteses
+    - desenho_de_experimento
+    may_authorize: []
+    may_execute:
+    - experimentos_em_ambiente_isolado
+    forbidden:
+    - label: promocao direta a producao
+      pattern: (auto_promote|direct_to_prod)
+    estado:
+      procedencia: '[CODIGO]'
+      descricao: '1 commit (2026-04-19), apenas README. Zero linhas de codigo. Os outros 14 repositorios
+        tem commits entre 14 e 26 de agosto. Nao construir ainda e defensavel: P&D deve ser o ultimo loop,
+        depois de governance, evidence e lineage funcionarem. Mas o consumidor ja declarado na ACADEMIA
+        e defeito de coerencia a corrigir agora.
+
+        '
+pendencias: []
+adrs_pendentes:
+- id: ADR-001
+  tema: Extracao fisica do kernel constitucional do repositorio CDVIRTUAL
+  referencia: monolitos.core.fronteira_fisica.P1_07B_extracao_fisica
+  bloqueia: nada — a fronteira semantica ja e exigivel
+milestone:
+  current_constitution_version: 1.15.0
+  M1_CONSTITUTION_DEFINITION:
+    status: PASS
+    baseline_constitution_version: 1.0.0
+    nota: M1 foi concluido contra a Constituicao 1.0.0. O campo preserva lineage historico; nao sobrescrever
+      com a versao corrente.
+    criterios:
+      CONSTITUTION_PENDING_DECISIONS: 0
+      CANONICAL_MONOLITH_IDS: 15
+      CANONICAL_ENVELOPE_DEFINED: true
+      CONTRACT_VERSION_POLICY_DEFINED: true
+      TRANSPORT_POLICY_DEFINED: true
+      ANCHOR_ROLE_FIXED: true
+      HUB_ROLE_FIXED: true
+      CORE_SEMANTIC_BOUNDARY_FIXED: true
+      CERTIFICATION_CHECKER_FAIL_CLOSED: true
+  M2_FEDERATION_PROTOCOL_AND_STATIC_CONVERGENCE:
+    status: ACTIVE
+    termina_com: protocolo publicado e convergencia ESTATICA — sem runtime
+    criterios:
+      SECRET_EXPOSURE_STATUS: KNOWN
+      CORE_MOCK_PROVENANCE: KNOWN
+      DIRECT_CROSS_DOMAIN_DB: 0
+      CORE_CI_ENABLED: true
+      FEDERATION_ENVELOPE_IMPLEMENTED: true
+      PRODUCER_REGISTRY_IMPLEMENTED: true
+      EVENT_REGISTRY_PUBLISHED: true
+      FEDERATION_SDK_IMPLEMENTED: true
+      CONTRACT_VERSION_ENFORCED: true
+      EVENT_RECONCILIATION_LEDGER_COMPLETE_FOR_MINIMUM_THREAD: true
+      MINIMUM_THREAD_STATICALLY_CONFORMANT: true
+      MINIMUM_THREAD_AUTHORITY_VIOLATIONS: 0
+    nao_exigido: ALL_649_EVENTS_RECONCILED — P2.5B corre em paralelo
+  M3_AUTHENTICATED_RUNTIME_CONFORMANCE:
+    status: NOT_STARTED
+    termina_com: fronteiras vivas autenticadas
+    criterios:
+      CORE_ARCHIMEDES_AUTHENTICATED_BOUNDARY: PASS
+      DURABILITY: PASS
+      IDEMPOTENCY: PASS
+      EVENT_DELIVERY: PASS
+      REPLAY: PASS
+  M4_FIRST_CAUSAL_AUTHORITY_CHAIN:
+    status: NOT_STARTED
+    termina_com: ARCHIMEDES -> CEFEIDA -> JOHN -> ANCHOR -> OPERA com lineage E2E
+    criterios:
+      MINIMUM_CAUSAL_THREAD_RUNTIME: PASS
+      MINIMUM_CAUSAL_THREAD_REPLAY: PASS
+      MINIMUM_CAUSAL_THREAD_LINEAGE: PASS
+  M5_CONTINENTAL_CLOSURE:
+    status: FROZEN
+  somente_entao: W90_CAN_START=true
+  nota_versoes: 'current_constitution_version DEVE espelhar meta.versao. M1.baseline_constitution_version
+    e historico e PODE divergir de proposito: registra contra qual versao M1 foi certificado.'
+  pendencias_abertas_no_ledger: ver LICEU_DECISION_LEDGER
+minimum_federated_causal_thread:
+  procedencia: '[DECIDIDO 2026-08-29]'
+  razao: Com 455 orfaos, normalizar todo o ecossistema antes de provar UMA cadeia seria erro de sequencia.
+  cadeia:
+  - archimedes.planning.state.authoritative
+  - cefeida.evidence.published
+  - john.recommendation.generated
+  - anchor.authorization.granted
+  - opera.execution.created
+  exigencias_por_elo:
+  - one authoritative owner
+  - one schema
+  - one SemVer version
+  - one lineage model
+  - one test producer
+  - one test consumer
+  - one durable event
+  - one replay proof
+  nota: nomes finais podem mudar em P2; o principio nao
+  nao_e_sequencia_universal: Serve para certificar a primeira cadeia. CEFEIDA pode observar a realidade
+    ANTES de qualquer planejamento. Na arquitetura madura CEFEIDA e ARCHIMEDES sao paralelos sob REALITY,
+    convergindo em JOHN. O sistema nao deve impor sequencia linear universal.
+separacao_de_artifacts:
+  procedencia: '[DECIDIDO 2026-08-29]'
+  razao: a Constituicao nao deve virar arquivo gigante com 649 decisoes
+  liceu_constitution.yaml: invariantes, ownership de autoridade, regras de protocolo
+  liceu_event_registry.yaml: contratos de evento canonicos ATIVOS
+  liceu_event_reconciliation_ledger.yaml: migracao, deprecacao, historia
+  FEDERATION_EVENT_DISCOVERY_GRAPH.json: evidencia gerada (nunca editar a mao)

@@ -1,0 +1,37 @@
+name: Main Guard
+
+# Check POS-FATO: roda depois de cada push em main e falha (abrindo issue)
+# quando o commit nao veio de um pull request. Nao substitui a protecao de
+# branch — indisponivel no plano atual (ARCHIMEDES #13) — mas garante que um push
+# direto nunca passa em silencio.
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  pr-provenance:
+    name: Commit em main veio de um PR mergeado
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (so o script)
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          fetch-depth: 1
+
+      - name: Verify the pushed head is a merged pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+          PUSHER: ${{ github.actor }}
+        run: bash .github/scripts/main_guard.sh

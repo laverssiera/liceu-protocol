@@ -1,0 +1,496 @@
+meta:
+  artifact: LICEU_EVENT_RECONCILIATION_LEDGER
+  versao: 0.2.0-semeado
+  data: '2026-08-29'
+  constitution_version: 1.15.0
+  discovery_sha256: 7c3aa2cd14846888b875f9da8cbe4ae823607bf892745bdda52261a43a22e288
+  fase: P2.5 — Event Graph Reconciliation
+  regra: classification e disposition NULOS exigem decisao humana. Nenhuma IA deve preenche-los. Campos
+    de discovery sao evidencia gerada e nao devem ser editados a mao.
+  escopo_P2_5A: cadeia causal minima (5 eventos) — bloqueia M2
+  escopo_P2_5B: os 644 restantes — corre em paralelo, nao bloqueia
+  constitution_sha256: 92a9dc9e47243cfc9e50a278e6de8e39fac1a93668a748daeba866ddf7e5d332
+  checker_version: 1.1.0
+  event_graph_generator_version: 1.1.0
+  repo_commit_set:
+    3C273-Analytics: 26b90c47fd65
+    ANCHOR.OS: 447c76bba696
+    Archimedes-ImobTech: 3c858581d317
+    BIM.ARQ.ENG: aef252f92679
+    CEA-INVESTIMENTOS: f9e0acd7cf73
+    ECONO.TECH: 2760af76fcdc
+    FORNECEDORES: ebdc933044a2
+    GAME-MKT: 07cf3c826211
+    HUB-BACKOFICE: 998f97731dd7
+    JURIDICO-TECH: 7261d4e552e9
+    John-Brasileiro: 8c4026176b90
+    LICEU-ACADEMIA-DO-SABER: 22f7a769f720
+    LICEU_6.0_CONSTRUTORA_VIRTUAL: 59248ee12afb
+    OPERA-ES: a4e62473d32e
+    P-D-LICEU: a9f3a7acf6a7
+  cadeia_auditavel: SOURCE CODE SNAPSHOT -> DISCOVERY GRAPH HASH -> CONSTITUTION HASH -> RECONCILIATION
+    LEDGER -> EVENT REGISTRY
+  constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
+    ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
+P2_5A_minimum_causal_thread:
+  archimedes.planning.state.authoritative:
+    discovery_status: NOT_DISCOVERED
+    current_producers: []
+    current_consumers: []
+    constitutional_owner: liceu.archimedes
+    classification: AUTHORITATIVE_EVENT
+    disposition: IMPLEMENT_PER_PROTOCOL_V1
+    replacement: null
+    evidence_required:
+    - definir schema + SemVer em P2.1
+    - produtor de teste
+    - consumidor de teste
+    - prova de durable + replay
+    runtime_verified: false
+  cefeida.evidence.published:
+    discovery_status: NOT_DISCOVERED
+    current_producers: []
+    current_consumers: []
+    constitutional_owner: liceu.cefeida
+    classification: AUTHORITATIVE_EVENT
+    disposition: IMPLEMENT_PER_PROTOCOL_V1
+    replacement: null
+    evidence_required:
+    - definir schema + SemVer em P2.1
+    - produtor de teste
+    - consumidor de teste
+    - prova de durable + replay
+    runtime_verified: false
+  john.recommendation.generated:
+    discovery_status: AUTHORITY_VIOLATION
+    current_producers:
+    - liceu.opera
+    current_consumers:
+    - liceu.archimedes
+    constitutional_owner: liceu.john
+    classification: AUTHORITATIVE_EVENT
+    disposition: REMOVE_FOREIGN_PRODUCERS
+    replacement: null
+    evidence_required:
+    - classificar apps/opera/api/construction.py — OPERA nao pode produzir a recomendacao que legitima
+      a propria execucao
+    - definir schema + SemVer em P2.1
+    runtime_verified: false
+  anchor.authorization.granted:
+    discovery_status: NOT_DISCOVERED
+    current_producers: []
+    current_consumers: []
+    constitutional_owner: liceu.anchor
+    classification: AUTHORITATIVE_EVENT
+    disposition: IMPLEMENT_PER_PROTOCOL_V1
+    replacement: null
+    evidence_required:
+    - definir schema + SemVer em P2.1
+    - produtor de teste
+    - consumidor de teste
+    - prova de durable + replay
+    runtime_verified: false
+  opera.execution.created:
+    discovery_status: NOT_DISCOVERED
+    current_producers: []
+    current_consumers: []
+    constitutional_owner: liceu.opera
+    classification: AUTHORITATIVE_EVENT
+    disposition: IMPLEMENT_PER_PROTOCOL_V1
+    replacement: null
+    evidence_required:
+    - definir schema + SemVer em P2.1
+    - produtor de teste
+    - consumidor de teste
+    - prova de durable + replay
+    runtime_verified: false
+P2_5B_authority_violations:
+  contract.created:
+    discovery_status: AUTHORITY_VIOLATION
+    current_producers:
+    - liceu.core
+    - liceu.hub
+    - liceu.legal
+    current_consumers:
+    - liceu.archimedes
+    constitutional_owner: liceu.legal
+    classification: DEPRECATED
+    disposition: DISAMBIGUATE_NAMESPACE
+    replacement:
+      core: core.contract.registered
+      legal: legal.contract.created
+      hub: hub.projection.updated
+    evidence_required:
+    - 'separar: CORE=schema contract, LEGAL=acordo, HUB=projecao (HUB deveria apenas observar)'
+    runtime_verified: false
+  contract.signed:
+    discovery_status: AUTHORITY_VIOLATION
+    current_producers:
+    - liceu.core
+    - liceu.hub
+    - liceu.legal
+    current_consumers:
+    - liceu.archimedes
+    constitutional_owner: liceu.legal
+    classification: DEPRECATED
+    disposition: DISAMBIGUATE_NAMESPACE
+    replacement:
+      core: core.contract.registered
+      legal: legal.contract.signed
+      hub: hub.projection.updated
+    evidence_required:
+    - 'separar: CORE=schema contract, LEGAL=acordo, HUB=projecao (HUB deveria apenas observar)'
+    runtime_verified: false
+  john.decision.made:
+    discovery_status: AUTHORITY_VIOLATION
+    current_producers:
+    - liceu.bim
+    - liceu.cefeida
+    current_consumers:
+    - liceu.archimedes
+    - liceu.market
+    constitutional_owner: liceu.john
+    classification: DEPRECATED
+    disposition: REMOVE_FOREIGN_PRODUCERS
+    replacement: john.recommendation.generated
+    evidence_required:
+    - classificar bim/john/event_brain.py
+    - classificar decision_orchestrator.py do CEFEIDA
+    runtime_verified: false
+  john.finance.decision:
+    discovery_status: AUTHORITY_VIOLATION
+    current_producers:
+    - liceu.cea
+    - liceu.hub
+    current_consumers:
+    - liceu.archimedes
+    constitutional_owner: liceu.john
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required:
+    - decidir a pergunta acima antes de qualquer rename
+    runtime_verified: false
+    pergunta_aberta: 'E decisao cognitiva do JOHN ou conclusao financeira do CEA com nome historicamente
+      errado? Se for CEA: financial.feasibility.assessed / capital.structure.proposed / financial.exposure.calculated,
+      e JOHN produz recommendation sobre esses fatos.'
+P2_5B_duplicate_authority:
+  artifacts.w89_a.registered.v1:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.archimedes
+    - liceu.bim
+    - liceu.core
+    current_consumers: []
+    constitutional_owner: null
+    classification: CERTIFICATION_EVENT
+    disposition: PRESERVE_HISTORY
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    producer_files:
+    - runtime/wave_89_a_canonical_federation_republish.py
+    - runtime/bim_arch_eng/wave89a_canonical_resolution_gate.py
+    - cross_workspace_canonical_federation_gate.py
+    - w89_event_publisher.py
+    nota: artifact historico da campanha W89 — nao e falha arquitetural produtiva
+  commission.protected:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.core
+    - liceu.legal
+    current_consumers: []
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    producer_files:
+    - liceu-6-0/monolitos/juridicotech/main.py
+    - backend/app/services/legal_core.py
+  federation.monolith.registered:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.academy
+    - liceu.legal
+    current_consumers: []
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    producer_files:
+    - apps/civilization-runtime/src/federation/federation-authority.ts
+    - apps/interplanetary-law-runtime/src/federation/federation-authority.ts
+  federation.runtime.register:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.cea
+    - liceu.econotech
+    - liceu.hub
+    - liceu.legal
+    current_consumers: []
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required:
+    - confirmar se CEA/ECONOTECH/HUB/JURIDICOTECH implementam runtime federativo proprio em vez de usar
+      o SDK do CORE
+    - candidato de classe inteira de duplicacao — atacar em P3 apos o SDK (P2.3)
+    runtime_verified: false
+    producer_files:
+    - backend/app/federation/authority/runtime.py
+    - backend/federation/authority/runtime.py
+    - app/federation/federation_authority.py
+    - apps/backend-api/app/federation/authority/runtime.py
+    hipotese: runtime federativo duplicado dentro de 4 dominios
+    destino_provavel: liceu.core
+  john.learn:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.academy
+    - liceu.opera
+    current_consumers:
+    - liceu.archimedes
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    producer_files:
+    - api/main.py
+    - app/routers/opera.py
+  lead.created:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.archimedes
+    - liceu.core
+    - liceu.market
+    current_consumers:
+    - liceu.archimedes
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    producer_files:
+    - apps/api/stream_bus/nats_client.py
+    - liceu-6-0/core-sdk/scripts/publish_demo_flow.py
+    - liceu-6-0/monolitos/archimedes/main.py
+    - scripts/check_events.py
+  legal.contract.signed:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.suppliers
+    - liceu.legal
+    current_consumers: []
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    producer_files:
+    - backend/app/routers/procurement.py
+    - apps/backend-api/app/contracts/router.py
+    - backend/app/services/legal_ecosystem.py
+  trust.score.updated:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.suppliers
+    - liceu.legal
+    current_consumers: []
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    producer_files:
+    - backend/app/services/trust_service.py
+    - backend/app/routers/trust.py
+  twin.updated:
+    discovery_status: DUPLICATE_AUTHORITY
+    current_producers:
+    - liceu.bim
+    - liceu.legal
+    current_consumers: []
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required:
+    - BIM possui o fato do twin; JURIDICOTECH produz avaliacao legal SOBRE o twin, nao o twin
+    runtime_verified: false
+    producer_files:
+    - twin-runtime/app/main.py
+    - backend/app/routers/legal_digital_twin.py
+    proposta:
+      liceu.bim: bim.twin.updated
+      liceu.legal: legal.twin.compliance.assessed
+P2_5B_missing_producer_amostra:
+  hub.budget.approved:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.archimedes
+    - liceu.market
+    constitutional_owner: liceu.cea
+    classification: DEPRECATED
+    disposition: RENAME_AND_MIGRATE_CONSUMERS
+    replacement: cea.budget.approved
+    evidence_required: []
+    runtime_verified: false
+    nota: HUB nao e autoridade financeira. NAO implementar produtor no HUB.
+  hub.budget.limit:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.archimedes
+    - liceu.market
+    constitutional_owner: liceu.cea
+    classification: DEPRECATED
+    disposition: RENAME_AND_MIGRATE_CONSUMERS
+    replacement: cea.budget.limit
+    evidence_required: []
+    runtime_verified: false
+    nota: HUB nao e autoridade financeira. NAO implementar produtor no HUB.
+  deal.created:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.archimedes
+    - liceu.legal
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+  inspection.created:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.anchor
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required:
+    - 'P3: classificar app/anchor/services/* e precon/'
+    runtime_verified: false
+    pergunta_aberta: A capacidade inteira (precon/inspecao) pertence ao ANCHOR? Provavelmente nao. Classificar
+      o MODULO antes de tratar o evento.
+  inspection.scheduled:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.anchor
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required:
+    - 'P3: classificar app/anchor/services/* e precon/'
+    runtime_verified: false
+    pergunta_aberta: A capacidade inteira (precon/inspecao) pertence ao ANCHOR? Provavelmente nao. Classificar
+      o MODULO antes de tratar o evento.
+  inspection.images_uploaded:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.anchor
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required:
+    - 'P3: classificar app/anchor/services/* e precon/'
+    runtime_verified: false
+    pergunta_aberta: A capacidade inteira (precon/inspecao) pertence ao ANCHOR? Provavelmente nao. Classificar
+      o MODULO antes de tratar o evento.
+  anchor.precon.report.generated:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.anchor
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required:
+    - 'P3: classificar app/anchor/services/* e precon/'
+    runtime_verified: false
+    pergunta_aberta: A capacidade inteira (precon/inspecao) pertence ao ANCHOR? Provavelmente nao. Classificar
+      o MODULO antes de tratar o evento.
+  cefeida.causal.analyze:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.cefeida
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    pergunta_aberta: FUTURE_CONTRACT, COMMAND, QUERY ou DEAD_CODE? W90 deve ficar na funcao minima (OBSERVATION/METRIC/EVIDENCE/FORECAST),
+      nao construir 6 engines.
+  cefeida.digital_twin.query:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.cefeida
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    pergunta_aberta: FUTURE_CONTRACT, COMMAND, QUERY ou DEAD_CODE? W90 deve ficar na funcao minima (OBSERVATION/METRIC/EVIDENCE/FORECAST),
+      nao construir 6 engines.
+  cefeida.temporal.predict:
+    discovery_status: MISSING_PRODUCER
+    current_producers: []
+    current_consumers:
+    - liceu.cefeida
+    constitutional_owner: null
+    classification: null
+    disposition: null
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    pergunta_aberta: FUTURE_CONTRACT, COMMAND, QUERY ou DEAD_CODE? W90 deve ficar na funcao minima (OBSERVATION/METRIC/EVIDENCE/FORECAST),
+      nao construir 6 engines.
+P2_5B_legacy:
+  archimedes.deal.closed:
+    discovery_status: LEGACY
+    current_producers: []
+    current_consumers:
+    - liceu.archimedes
+    - liceu.market
+    constitutional_owner: null
+    classification: LEGACY
+    disposition: REMOVE_CONSUMERS
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    nota: ARCHIMEDES-como-CRM (definicao superseded); sem produtor
+  archimedes.lead.converted:
+    discovery_status: LEGACY
+    current_producers: []
+    current_consumers:
+    - liceu.archimedes
+    - liceu.market
+    constitutional_owner: null
+    classification: LEGACY
+    disposition: REMOVE_CONSUMERS
+    replacement: null
+    evidence_required: []
+    runtime_verified: false
+    nota: ARCHIMEDES-como-CRM (definicao superseded); sem produtor
