@@ -7,10 +7,10 @@ meta:
     classificacao no ledger + schema + SemVer + dono constitucional. Este registry e a FONTE dos conformance
     tests.'
   promocao: discovery -> ledger (classificado) -> registry (canonico) -> conformance
-  contract_registry_sha256: 2a9f4461d492842a50a09ce7da773acb864cb1c3312bc371291206c75eabd07d
+  contract_registry_sha256: e4210a954100da3b2e7c06862de7b6fb25d499b41ea63a437c14225858e7cb5a
   constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
     ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
-  versao: 1.4.0
+  versao: 1.5.0
   nota_versao: campo unico e monotonico. Antes havia registry_version=1.1.0 e versao=1.2.0 simultaneos,
     e a versao anterior (1.3.0) era superior a nova declarada.
 events:
@@ -104,8 +104,26 @@ events:
     contract_lifecycle: ACTIVE
     nota: contract_lifecycle e do CONTRATO; implementation_status e do CODIGO. Nao sao contraditorios
       — sao eixos distintos.
+  legal.admissibility.assessed:
+    owner: liceu.legal
+    allowed_producers:
+    - liceu.legal
+    classification: AUTHORITATIVE_EVENT
+    contract_id: liceu.legal.admissibility
+    contract_version: 1.0.0
+    payload_schema: liceu_contract_registry.yaml#/contracts/liceu.legal.admissibility/payload_schema
+    transport:
+      canonical_publish: http
+      asynchronous_propagation: nats_jetstream
+    implementation_status: DECLARED_BUT_NOT_IMPLEMENTED
+    conformance_tests: []
+    posicao_na_cadeia: null
+    natureza: PARECER_TRANSVERSAL
+    contract_lifecycle: ACTIVE
+    nota: parecer de admissibilidade juridica sobre um fato de qualquer elo; e o insumo que anchor.authorization
+      referencia em legal_basis_refs. Quem publica e o JURIDICOTECH (outro PR, outro repo).
 resumo:
-  CANONICAL_REGISTRY_EVENTS: 6
-  CONTRACT_IDS: 8
-  CONTRACT_VERSIONS: 10
+  CANONICAL_REGISTRY_EVENTS: 7
+  CONTRACT_IDS: 9
+  CONTRACT_VERSIONS: 11
   IMPLEMENTED_IN_MONOLITH: 0

@@ -5,8 +5,8 @@ Registries, conformance kit (G1–G5), Federation SDK, registry checker e bounda
 checker. Decisão: [ADR-001](docs/ADR-001-onde-o-kit-vive.md).
 
 ```
-constitution=1.15.0   conformance_kit=0.9.0   federation_sdk=0.4.0
-registry_checker=1.4.0   boundary_checker=1.1.0   package_date=2026-08-29
+constitution=1.15.0   conformance_kit=0.10.0   federation_sdk=0.4.0
+registry_checker=1.4.0   boundary_checker=1.1.0   package_date=2026-09-18
 ```
 
 ## Instalar
@@ -14,7 +14,7 @@ registry_checker=1.4.0   boundary_checker=1.1.0   package_date=2026-08-29
 Fixe a versão. As três Mães validam sob a mesma lei só se as três fixarem a mesma.
 
 ```bash
-pip install "liceu-protocol @ git+https://github.com/laverssiera/liceu-protocol@v0.9.0"
+pip install "liceu-protocol @ git+https://github.com/laverssiera/liceu-protocol@v0.10.0"
 ```
 
 ## Usar
@@ -36,7 +36,7 @@ o loader registra-os em `sys.modules` antes de executar o SDK. Não importe
 cd liceu_protocol
 sha256sum -c MANIFEST                                   # 9/9 OK
 python liceu_registry_check.py                          # 0 erros
-LICEU_CONFORMANCE_STRICT=1 python liceu_conformance.py --self-test   # 59/59
+LICEU_CONFORMANCE_STRICT=1 python liceu_conformance.py --self-test   # 76/76
 python liceu_federation_sdk.py --self-test              # 25/25
 ```
 
