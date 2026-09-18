@@ -69,5 +69,10 @@ if [ "${DRY_RUN:-}" = "1" ]; then
 ' "$title" "$body"
   exit 1
 fi
-gh issue create --repo "$REPO" --title "$title" --label "ci-cd" --body "$body"
+# A label e conveniencia; a issue e o registro. Sem label no repo, abre sem ela.
+label_args=()
+if gh label list --repo "$REPO" --json name --jq '.[].name' | grep -qx "ci-cd"; then
+  label_args=(--label "ci-cd")
+fi
+gh issue create --repo "$REPO" --title "$title" "${label_args[@]}" --body "$body"
 exit 1
