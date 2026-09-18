@@ -1,5 +1,5 @@
-constitution=1.15.0
-conformance_kit=0.10.0
+constitution=1.16.0
+conformance_kit=0.11.0
 registry_checker=1.4.0
 federation_sdk=0.4.0
 boundary_checker=1.1.0

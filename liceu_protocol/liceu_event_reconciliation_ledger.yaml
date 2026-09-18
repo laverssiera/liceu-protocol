@@ -2,14 +2,14 @@ meta:
   artifact: LICEU_EVENT_RECONCILIATION_LEDGER
   versao: 0.2.0-semeado
   data: '2026-08-29'
-  constitution_version: 1.15.0
+  constitution_version: 1.16.0
   discovery_sha256: 7c3aa2cd14846888b875f9da8cbe4ae823607bf892745bdda52261a43a22e288
   fase: P2.5 — Event Graph Reconciliation
   regra: classification e disposition NULOS exigem decisao humana. Nenhuma IA deve preenche-los. Campos
     de discovery sao evidencia gerada e nao devem ser editados a mao.
   escopo_P2_5A: cadeia causal minima (5 eventos) — bloqueia M2
   escopo_P2_5B: os 644 restantes — corre em paralelo, nao bloqueia
-  constitution_sha256: 92a9dc9e47243cfc9e50a278e6de8e39fac1a93668a748daeba866ddf7e5d332
+  constitution_sha256: c4c421d0fe22576aea5eeb242224ab3fd1138e3b6a6d8cc094b2fc512830b1f5
   checker_version: 1.1.0
   event_graph_generator_version: 1.1.0
   repo_commit_set:
@@ -30,8 +30,7 @@ meta:
     P-D-LICEU: a9f3a7acf6a7
   cadeia_auditavel: SOURCE CODE SNAPSHOT -> DISCOVERY GRAPH HASH -> CONSTITUTION HASH -> RECONCILIATION
     LEDGER -> EVENT REGISTRY
-  constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
-    ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
+  constitution_compatibility: 'compativel com 1.15.0: acrescenta Mandate Plane, liceu.mandate (posicao 0) e P08. Nenhuma capacidade, teto ou contrato existente alterado.'
 P2_5A_minimum_causal_thread:
   archimedes.planning.state.authoritative:
     discovery_status: NOT_DISCOVERED

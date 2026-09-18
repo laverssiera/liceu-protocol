@@ -34,7 +34,7 @@ import json
 import os
 import sys
 
-KIT_VERSION = "0.10.0"
+KIT_VERSION = "0.11.0"
 
 # Modo estrito: em certificacao, a ausencia de jsonschema deve FALHAR, nao
 # degradar para o motor interno. Degradacao silenciosa de validador e a mesma
@@ -284,6 +284,25 @@ def _g5(contract_id: str, p: dict, env: dict | None = None) -> None:
             raise Rejeicao("G5-LOCAL",
                 f"recommended_alternative_id {rec!r} nao esta em alternatives")
 
+    elif contract_id == "liceu.mandate.planning-request":
+        # Posicao 0: origem humana da cadeia (P08). A prova humana forte e o
+        # CONTEUDO, nao a chave — mesma disciplina do authority.human-decision.
+        sig = p.get("human_signature")
+        if not isinstance(sig, str) or len(sig) < 64:
+            raise Rejeicao("G5-LOCAL",
+                "human_signature ausente ou com menos de 64 caracteres: "
+                "mandato sem prova criptografica e fabricavel")
+        mfa = p.get("mfa_assertion_hash")
+        if not isinstance(mfa, str) or len(mfa) < 64:
+            raise Rejeicao("G5-LOCAL", "mfa_assertion_hash ausente ou curto")
+        if len(str(p.get("nonce") or "")) < 16:
+            raise Rejeicao("G5-LOCAL", "nonce ausente ou curto: assinatura replayavel")
+        if str(p.get("requested_at") or "") > str(p.get("signed_at") or ""):
+            raise Rejeicao("G5-LOCAL",
+                "requested_at posterior a signed_at: pedido formalizado antes de ser assinado")
+        if not str(p.get("problem_statement") or "").strip():
+            raise Rejeicao("G5-LOCAL", "problem_statement vazio: pedido sem problema e arbitrio")
+
     elif contract_id == "liceu.legal.admissibility":
         # Regras cruzadas que o JSON Schema nao alcanca. As condicionais
         # (conditions x status, legal_basis_refs x status) ja estao no schema
@@ -469,6 +488,38 @@ def _humano(**over):
               source_event_id="s1", payload=pay)
     kw.update(over)
     return _base(**kw)
+
+
+def _mandato(**over):
+    """Pedido de planejamento com mandato humano valido; over injeta o ataque."""
+    pay = over.pop("payload", None) or {
+        "planning_request_id": "pr-mandato-0001",
+        "program_id": "prog-corredor-sul",
+        "problem_statement": "escoamento logistico do corredor sul saturado em 2027",
+        "territorial_scope": "REGION",
+        "scale": "REGIONAL",
+        "requested_at": "2026-09-18T10:00:00Z",
+        "mandate_holder_id": "pseudo-m1",
+        "human_signature": "s" * 64,
+        "human_authentication_method": "MFA_FIDO2",
+        "mfa_assertion_hash": "m" * 64,
+        "signed_at": "2026-09-18T10:05:00Z",
+        "nonce": "n" * 16,
+    }
+    kw = dict(event_type="mandate.planning.requested", producer_id="liceu.mandate",
+              contract_id="liceu.mandate.planning-request", contract_version="1.0.0",
+              payload=pay)
+    kw.update(over)
+    e = _base(**kw)
+    if "causation_id" not in over:
+        e.pop("causation_id", None)  # posicao 0: nao tem causa (a menos que o ataque a injete)
+    return e
+
+
+def _mandato_pay(**over):
+    base = _mandato()["payload"]
+    base.update(over)
+    return base
 
 
 def _parecer(**over):
@@ -1138,6 +1189,34 @@ CASOS = [
 
  ("LEGAL carrega decision_id (JURIDICOTECH nao decide)",
   False, _parecer(decision_id="d-legal-1")),
+
+ # --- liceu.mandate.planning-request 1.0.0 (posicao 0, P08) ---
+ ("MANDATO pedido valido com prova humana forte",
+  True, _mandato()),
+
+ ("MANDATO sem human_signature",
+  False, _mandato(payload={k: v for k, v in _mandato_pay().items() if k != "human_signature"})),
+
+ ("MANDATO human_signature curta",
+  False, _mandato(payload=_mandato_pay(human_signature="curta"))),
+
+ ("MANDATO nonce curto (assinatura replayavel)",
+  False, _mandato(payload=_mandato_pay(nonce="abc"))),
+
+ ("MANDATO requested_at posterior a signed_at",
+  False, _mandato(payload=_mandato_pay(requested_at="2026-09-18T11:00:00Z"))),
+
+ ("MANDATO problem_statement curto demais",
+  False, _mandato(payload=_mandato_pay(problem_statement="x"))),
+
+ ("MANDATO com causation_id (posicao 0 nao tem causa)",
+  False, _mandato(causation_id="c-alguem")),
+
+ ("MANDATO emitido pelo JOHN (sistema nao origina cadeia — P08)",
+  False, _mandato(producer_id="liceu.john")),
+
+ ("MANDATO carrega decision_id",
+  False, _mandato(decision_id="d1")),
 ]
 
 

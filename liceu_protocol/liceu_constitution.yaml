@@ -1,5 +1,5 @@
 meta:
-  versao: 1.15.0
+  versao: 1.16.0
   status: FINAL
   data: '2026-08-29'
   pendencias_abertas: 0
@@ -38,6 +38,11 @@ meta:
   changelog_1_15_0: 'PATCH de recuperacao (LIC-PROTOCOL-RECOVERY-003): restaura decision_id, governance_decision_id
     e execution_id no envelope; separa autoridade_da_cadeia de autoridade_do_control_plane; separa campos_exigidos_pelo_protocolo
     de campos_aceitos_pelo_servidor, este ultimo refletindo o CORE real.'
+  changelog_1_16_0: 'MINOR (decisao 2026-09-18, levantamento B2): acrescenta o Mandate Plane e o produtor
+    liceu.mandate — quem empreende. A cadeia minima exigia planning_request_id no elo 1 sem que a
+    Constituicao nomeasse de que dominio vem um pedido de planejamento; "W93F22" era o nome de uma wave
+    nunca executada, nao de um produtor. Posicao 0 (mandate.planning.requested) PRECEDE a cadeia minima
+    e nao a altera. Principio P08. Nenhuma capacidade, teto ou contrato existente alterado.'
 global:
   canonical_envelope:
     procedencia: '[DECIDIDO 2026-08-29]'
@@ -245,6 +250,9 @@ global:
       ped:
         producer_id: liceu.research
         display_name: P&D.IA
+      mandate:
+        producer_id: liceu.mandate
+        display_name: MANDATO
     separar_de:
     - canonical_id
     - display_name
@@ -365,6 +373,12 @@ global:
     P05: EXPERIMENT != PRODUCTION TRUTH
     P06: NO CROSS-DOMAIN DATABASE ACCESS
     P07: EVIDENCE != RECOMMENDATION != AUTHORIZATION != EXECUTION != OBSERVATION != LEARNING
+    P08: NO CHAIN WITHOUT HUMAN MANDATE
+    nota_P08: '[DECIDIDO 2026-09-18] A cadeia causal nasce de um pedido com mandato humano (posicao 0,
+      liceu.mandate), com prova humana forte no proprio fato. Nenhum sistema — JOHN, HUB, ARCHIMEDES —
+      origina um pedido de planejamento: se um sistema o emitisse, a cadeia inteira nasceria de IA (P03).
+      O ARCHIMEDES continua podendo ESTUDAR por iniciativa propria (may_decide), mas o que entra na cadeia
+      minima e o estudo que responde a um mandato.'
   politica_de_severidade:
     procedencia: '[DECIDIDO 2026-08-29]'
     development: CRITICO
@@ -395,6 +409,15 @@ global:
       por classe de autoridade nao autorizada e AUTHORITY_VIOLATION (CRITICO).
     regra_de_instancia: allowed_producers lista CLASSES de autoridade (producer_id). Multiplas INSTANCIAS
       da mesma classe sao permitidas — necessario para o modelo global/interplanetario.
+    mandate.planning.requested:
+      authoritative_owner: liceu.mandate
+      allowed_producers:
+      - liceu.mandate
+      lifecycle: PLANNED
+      transport:
+        canonical_publish: http
+        asynchronous_propagation: nats_jetstream
+      nota: posicao 0 — precede a cadeia minima; o elo 1 o referencia por causation_id
     archimedes.planning.state.authoritative:
       authoritative_owner: liceu.archimedes
       allowed_producers:
@@ -1741,6 +1764,28 @@ monolitos:
         e defeito de coerencia a corrigir agora.
 
         '
+  mandate:
+    canonical_name: MANDATO
+    repository: null
+    authority_class: Mandate Plane
+    wave: null
+    mission: Quem empreende — origem humana da cadeia causal (posicao 0)
+    may_decide:
+    - programa_de_empreendimento
+    - problema_autorizado
+    - escopo_territorial
+    may_authorize: []
+    may_execute: []
+    forbidden:
+    - label: decidir onde construir
+      pattern: (candidates|where_to_build|ranking)
+    - label: autorizar gasto ou execucao
+      pattern: (governance_decision|execution_id|funding)
+    status_de_implementacao: 'DECLARED — produtor sem repositorio. Candidato a hospedar o emissor: HUB
+      (backoffice, onde uma solicitacao seria registrada), SEM lhe dar may_decide — o HUB projeta; quem
+      decide e o humano com mandato, autenticado como no authority.human-decision.'
+    observacao: '[DECIDIDO 2026-09-18] Escolha A do levantamento B2: abrir produtor de mandato em vez de
+      tornar planning_request_id opcional. Mandato explicito e pre-requisito, nao opcao.'
 pendencias: []
 adrs_pendentes:
 - id: ADR-001
@@ -1748,7 +1793,7 @@ adrs_pendentes:
   referencia: monolitos.core.fronteira_fisica.P1_07B_extracao_fisica
   bloqueia: nada — a fronteira semantica ja e exigivel
 milestone:
-  current_constitution_version: 1.15.0
+  current_constitution_version: 1.16.0
   M1_CONSTITUTION_DEFINITION:
     status: PASS
     baseline_constitution_version: 1.0.0
@@ -1812,6 +1857,14 @@ minimum_federated_causal_thread:
   - john.recommendation.generated
   - anchor.authorization.granted
   - opera.execution.created
+  posicao_0:
+    evento: mandate.planning.requested
+    produtor: liceu.mandate
+    procedencia: '[DECIDIDO 2026-09-18]'
+    razao: 'A cadeia minima de 5 certifica a federacao; nao diz de onde vem o primeiro impulso. O elo 1
+      exige planning_request_id: a posicao 0 e quem o emite. Fica FORA da lista `cadeia` de proposito —
+      a cadeia minima continua sendo 5 elos certificaveis; o mandato e a pre-condicao dela, com
+      contrato, teto e prova humana proprios.'
   exigencias_por_elo:
   - one authoritative owner
   - one schema

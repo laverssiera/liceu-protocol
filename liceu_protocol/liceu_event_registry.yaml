@@ -1,19 +1,36 @@
 meta:
   artifact: LICEU_EVENT_REGISTRY
   data: '2026-08-29'
-  constitution_version: 1.15.0
-  constitution_sha256: 92a9dc9e47243cfc9e50a278e6de8e39fac1a93668a748daeba866ddf7e5d332
+  constitution_version: 1.16.0
+  constitution_sha256: c4c421d0fe22576aea5eeb242224ab3fd1138e3b6a6d8cc094b2fc512830b1f5
   regra: 'Contem SOMENTE eventos promovidos a contrato canonico. Nunca os 649 do discovery. Promocao exige:
     classificacao no ledger + schema + SemVer + dono constitucional. Este registry e a FONTE dos conformance
     tests.'
   promocao: discovery -> ledger (classificado) -> registry (canonico) -> conformance
-  contract_registry_sha256: e4210a954100da3b2e7c06862de7b6fb25d499b41ea63a437c14225858e7cb5a
-  constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
-    ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
-  versao: 1.5.0
+  contract_registry_sha256: b843ea3191eef2a334dfd5b9f07a57b9610ed87f482107b54c238297f4dd2510
+  constitution_compatibility: 'compativel com 1.15.0: acrescenta Mandate Plane, liceu.mandate (posicao 0) e P08. Nenhuma capacidade, teto ou contrato existente alterado.'
+  versao: 1.6.0
   nota_versao: campo unico e monotonico. Antes havia registry_version=1.1.0 e versao=1.2.0 simultaneos,
     e a versao anterior (1.3.0) era superior a nova declarada.
 events:
+  mandate.planning.requested:
+    owner: liceu.mandate
+    allowed_producers:
+    - liceu.mandate
+    classification: AUTHORITATIVE_EVENT
+    contract_id: liceu.mandate.planning-request
+    contract_version: 1.0.0
+    payload_schema: liceu_contract_registry.yaml#/contracts/liceu.mandate.planning-request/payload_schema
+    transport:
+      canonical_publish: http
+      asynchronous_propagation: nats_jetstream
+    implementation_status: DECLARED_BUT_NOT_IMPLEMENTED
+    conformance_tests: []
+    posicao_na_cadeia: 0
+    natureza: ORIGEM_HUMANA_DA_CADEIA
+    contract_lifecycle: ACTIVE
+    nota: posicao 0 precede a cadeia minima (que segue sendo 5); o elo 1 o referencia por causation_id.
+      Produtor DECLARADO sem repositorio (Constituicao 1.16.0, monolitos.mandate).
   archimedes.planning.state.authoritative:
     owner: liceu.archimedes
     allowed_producers:
@@ -123,7 +140,7 @@ events:
     nota: parecer de admissibilidade juridica sobre um fato de qualquer elo; e o insumo que anchor.authorization
       referencia em legal_basis_refs. Quem publica e o JURIDICOTECH (outro PR, outro repo).
 resumo:
-  CANONICAL_REGISTRY_EVENTS: 7
-  CONTRACT_IDS: 9
-  CONTRACT_VERSIONS: 11
+  CANONICAL_REGISTRY_EVENTS: 8
+  CONTRACT_IDS: 10
+  CONTRACT_VERSIONS: 12
   IMPLEMENTED_IN_MONOLITH: 0

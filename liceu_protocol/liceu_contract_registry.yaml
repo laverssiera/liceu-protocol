@@ -1,20 +1,19 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.4.0
+  registry_version: 2.5.0
   fase: P2.1
   data: '2026-08-29'
-  constitution_version: 1.15.0
-  escopo: cadeia causal minima (5) + extensao CEA (2) + decisao humana (1) + admissibilidade juridica (1)
-    = 9 contract_ids
+  constitution_version: 1.16.0
+  escopo: mandato (posicao 0) + cadeia causal minima (5) + extensao CEA (2) + decisao humana (1)
+    + admissibilidade juridica (1) = 10 contract_ids
   status: DEFINIDO — 0/7 implementados. Os 2 do CEA substituem wave83/wave92 e NAO foram aplicados ao
     codigo.
   regra: 'Contrato definido nao e contrato implementado. A promocao para implementado exige conformance
     test passando contra produtor real.
 
     '
-  constitution_sha256: 92a9dc9e47243cfc9e50a278e6de8e39fac1a93668a748daeba866ddf7e5d332
-  constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
-    ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
+  constitution_sha256: c4c421d0fe22576aea5eeb242224ab3fd1138e3b6a6d8cc094b2fc512830b1f5
+  constitution_compatibility: 'compativel com 1.15.0: acrescenta Mandate Plane, liceu.mandate (posicao 0) e P08. Nenhuma capacidade, teto ou contrato existente alterado.'
   nota_extensao_cea: 'DOIS contratos, nao um: wave83 e planetario e raiz; wave92 e continental e DERIVA
     de outro fato. Cardinalidade e lineage diferentes — um contrato so obrigaria campos opcionais e enfraqueceria
     a validacao. NOMENCLATURA: o codigo usa campo `decision` com valores fund/review. A Constituicao da
@@ -25,6 +24,9 @@ meta:
     por decisao: exigir forcaria preenchimento, e preenchimento sob pressao produz referencia inventada.
     Ausencia honesta e melhor que referencia falsa.'
   indexacao: contract_id -> contract_version -> definicao
+  changelog_2_5_0: 'MINOR: acrescenta liceu.mandate.planning-request 1.0.0 (posicao 0) e o invariante
+    de causation no archimedes.planning-state (elo 1 aponta para um mandate.planning.requested). Nenhum
+    schema existente alterado. Decisao A do levantamento B2 (2026-09-18).'
   changelog_2_4_0: 'MINOR: acrescenta liceu.legal.admissibility 1.0.0 (produtor liceu.legal ja existia
     no Producer Registry sem contrato pelo qual publicar — CORE #32). Nenhum contrato existente
     alterado. Da insumo ao invariante de legal_coverage do anchor.authorization 1.1.0 (CORE #33).'
@@ -70,6 +72,118 @@ envelope_baseline:
 
     '
 contracts:
+  liceu.mandate.planning-request:
+    1.0.0:
+      contract_version: 1.0.0
+      event_type: mandate.planning.requested
+      classification: AUTHORITATIVE_EVENT
+      posicao_na_cadeia: 0
+      natureza: ORIGEM_HUMANA_DA_CADEIA
+      owner: liceu.mandate
+      allowed_producers:
+      - liceu.mandate
+      required_envelope_fields:
+      - artifact_id
+      - trace_id
+      forbidden_envelope_fields:
+        decision_id: mandato pede; nao decide (liceu.john)
+        governance_decision_id: mandato pede; nao autoriza (liceu.anchor)
+        execution_id: mandato pede; nao executa (liceu.opera)
+        causation_id: posicao 0 nao tem causa na cadeia — e a origem. Um pedido causado por outro fato
+          seria uma cadeia nascendo de sistema (P08)
+      authority_invariants:
+      - P08 — a cadeia nasce de mandato humano; o fato carrega prova humana forte (assinatura + MFA +
+        nonce), verificada como no authority.human-decision
+      - planning_request_id e o identificador que o elo 1 referencia; e emitido AQUI e em nenhum outro lugar
+      - scale do pedido <= liceu.mandate.scale_max (REGIONAL); acima disso o pedido nao existe — escala
+        para liceu.authority (autorizacao_acima_do_teto_delegado)
+      - o mandato pede um estudo; nao diz ONDE construir (ARCHIMEDES) nem autoriza (ANCHOR) nem paga (CEA)
+      domain_invariants:
+      - problem_statement nao vazio — pedido sem problema e arbitrio
+      - territorial_scope obrigatorio — sem escopo nao ha estudo
+      - requested_at <= signed_at (o pedido e formalizado quando o humano assina, nunca depois) — G5
+      - human_signature e mfa_assertion_hash com >= 64 caracteres; nonce >= 16 — G5
+      payload_schema:
+        type: object
+        required:
+        - planning_request_id
+        - program_id
+        - problem_statement
+        - territorial_scope
+        - scale
+        - requested_at
+        - mandate_holder_id
+        - human_signature
+        - human_authentication_method
+        - mfa_assertion_hash
+        - signed_at
+        - nonce
+        additionalProperties: false
+        properties:
+          planning_request_id:
+            type: string
+            minLength: 8
+          program_id:
+            type: string
+            minLength: 3
+            description: programa de empreendimento a que o pedido pertence
+          problem_statement:
+            type: string
+            minLength: 20
+            description: o problema a resolver, em linguagem do mandato — nunca a solucao
+          business_objective:
+            type: string
+          territorial_scope:
+            type: string
+            enum:
+            - SITE
+            - REGION
+            - TERRITORY
+            - CONTINENTAL
+            - PLANETARY
+          scale:
+            type: string
+            enum:
+            - LOCAL
+            - REGIONAL
+            - CONTINENTAL
+            - GLOBAL
+            - CIVILIZACIONAL
+            - INTERPLANETARIA
+          requested_at:
+            type: string
+            format: date-time
+          mandate_holder_id:
+            type: string
+            minLength: 3
+            description: PSEUDONIMIZADO — quem detem o mandato de empreender
+          mandate_basis_refs:
+            type: array
+            items:
+              type: string
+            description: referencias ao instrumento do mandato (ata, contrato social, delegacao). Referencia, nao afirmacao
+          human_signature:
+            type: string
+            minLength: 64
+            description: assinatura criptografica do detentor do mandato sobre o pedido
+          human_authentication_method:
+            type: string
+            enum:
+            - MFA_TOTP
+            - MFA_FIDO2
+            - MFA_SMARTCARD
+          mfa_assertion_hash:
+            type: string
+            minLength: 64
+            maxLength: 128
+          signed_at:
+            type: string
+            format: date-time
+          nonce:
+            type: string
+            minLength: 16
+            description: anti-replay da assinatura
+      status: ACTIVE
   liceu.archimedes.planning-state:
     1.0.0:
       contract_version: 1.0.0
@@ -87,6 +201,8 @@ contracts:
         governance_decision_id: ARCHIMEDES nao autoriza — autorizacao e do liceu.anchor
         execution_id: ARCHIMEDES nao executa — execucao e do liceu.opera
       authority_invariants:
+      - 'causation_id DEVE apontar para um mandate.planning.requested (posicao 0); planning_request_id do
+        payload e o do pedido referenciado (2.5.0, P08). Estudo sem mandato nao entra na cadeia minima.'
       - produz alternativa territorial, nunca escolha autorizada
       - estado deve estar em AUTHORITATIVE ou AUTHORITATIVE_OUTPUT do Authority Kernel
       - WHERE_TO_BUILD e WHY_TO_BUILD sao justificativas, nao aprovacoes
@@ -1125,6 +1241,15 @@ lineage_chain:
 
     '
   tabela:
+  - elo: 0
+    produtor: liceu.mandate
+    emite:
+    - planning_request_id
+    proibido:
+    - causation_id
+    - decision_id
+    - governance_decision_id
+    - execution_id
   - elo: 1
     produtor: liceu.archimedes
     emite:

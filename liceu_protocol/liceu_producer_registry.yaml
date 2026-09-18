@@ -1,13 +1,12 @@
 meta:
   artifact: LICEU_PRODUCER_REGISTRY
   registry_version: 1.4.0
-  constitution_version: 1.15.0
+  constitution_version: 1.16.0
   fase: P2.2
   regra: producer_id e IDENTIDADE, imutavel e independente de geografia. Localizacao vive em federation_id/node_id/scope.
     Multiplas instancias da mesma classe sao legitimas.
-  constitution_sha256: 92a9dc9e47243cfc9e50a278e6de8e39fac1a93668a748daeba866ddf7e5d332
-  constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
-    ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
+  constitution_sha256: c4c421d0fe22576aea5eeb242224ab3fd1138e3b6a6d8cc094b2fc512830b1f5
+  constitution_compatibility: 'compativel com 1.15.0: acrescenta Mandate Plane, liceu.mandate (posicao 0) e P08. Nenhuma capacidade, teto ou contrato existente alterado.'
   external_effect_criterio:
   - cria obrigacao perante terceiro
   - movimenta ou compromete capital
@@ -390,6 +389,38 @@ producers:
       teto_externo_aplicavel: true
       razao: constraint ate o proprio scale_max
       nota_se_nao_aplicavel: null
+  liceu.mandate:
+    canonical_key: mandate
+    display_name: MANDATO
+    authority_class: Mandate Plane
+    repository: null
+    wave: null
+    capabilities:
+      may_decide:
+      - programa_de_empreendimento
+      - problema_autorizado
+      - escopo_territorial
+      may_authorize: []
+      may_execute: []
+    state_ownership: []
+    instances:
+    - instance_id: liceu.mandate#earth-01
+      federation_id: earth
+      status: DECLARED
+    external_effect:
+      programa_de_empreendimento: false
+      problema_autorizado: false
+      escopo_territorial: false
+    external_effect_summary: NENHUMA
+    teto:
+      scale_max: REGIONAL
+      teto_interno: REGIONAL
+      teto_externo: null
+      teto_externo_aplicavel: false
+      razao: um mandato pede ate REGIONAL; acima escala para liceu.authority (autorizacao_acima_do_teto_delegado)
+      nota_se_nao_aplicavel: sem efeito externo — o pedido nao toca o mundo
+    nota: '[DECIDIDO 2026-09-18] Produtor DECLARADO sem codigo. Origem humana da cadeia (P08). O fato
+      carrega prova humana forte (padrao do authority.human-decision); sem ela o mandato e fabricavel.'
   liceu.market:
     canonical_key: gamemkt
     display_name: GAME MKT
