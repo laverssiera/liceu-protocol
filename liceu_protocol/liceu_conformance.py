@@ -34,7 +34,7 @@ import json
 import os
 import sys
 
-KIT_VERSION = "0.9.0"
+KIT_VERSION = "0.10.0"
 
 # Modo estrito: em certificacao, a ausencia de jsonschema deve FALHAR, nao
 # degradar para o motor interno. Degradacao silenciosa de validador e a mesma
@@ -284,6 +284,34 @@ def _g5(contract_id: str, p: dict, env: dict | None = None) -> None:
             raise Rejeicao("G5-LOCAL",
                 f"recommended_alternative_id {rec!r} nao esta em alternatives")
 
+    elif contract_id == "liceu.legal.admissibility":
+        # Regras cruzadas que o JSON Schema nao alcanca. As condicionais
+        # (conditions x status, legal_basis_refs x status) ja estao no schema
+        # como if/then — aqui entra o que depende de DOIS campos.
+        subj = p.get("subject_ref") or {}
+        fato = str(subj.get("occurred_at") or "")[:10]
+        if env is not None and subj.get("event_id") == env.get("event_id"):
+            raise Rejeicao("G5-LOCAL",
+                "subject_ref.event_id == event_id: parecer sobre si mesmo")
+        if str(p.get("assessed_at") or "")[:10] < fato:
+            raise Rejeicao("G5-LOCAL",
+                f"assessed_at anterior ao fato ({fato}): parecer nao antecede o fato")
+        for ref in p.get("legal_basis_refs") or []:
+            desde = str(ref.get("valid_from") or "")[:10]
+            ate = ref.get("valid_until")
+            if desde > fato:
+                raise Rejeicao("G5-LOCAL",
+                    f"{ref.get('norm')} {ref.get('article')}: valid_from {desde} posterior "
+                    f"ao fato {fato} — a norma de referencia e a vigente na DATA DO FATO, "
+                    f"nao a de hoje")
+            if ate and str(ate)[:10] < fato:
+                raise Rejeicao("G5-LOCAL",
+                    f"{ref.get('norm')} {ref.get('article')}: revogada em {str(ate)[:10]}, "
+                    f"antes do fato {fato} — norma nao vigente na data do fato")
+        if env is not None and env.get("scale") not in (None, "") and env.get("scale") != p.get("scale"):
+            raise Rejeicao("G5-LOCAL",
+                f"scale do envelope ({env.get('scale')}) != scale do parecer ({p.get('scale')})")
+
     elif contract_id == "liceu.authority.human-decision":
         # A decisao humana e o caminho de MAIOR risco do ecossistema. Nao basta
         # exigir a chave: e preciso exigir o CONTEUDO.
@@ -441,6 +469,32 @@ def _humano(**over):
               source_event_id="s1", payload=pay)
     kw.update(over)
     return _base(**kw)
+
+
+def _parecer(**over):
+    """Parecer de admissibilidade valido (COVERED); over injeta o ataque."""
+    pay = over.pop("payload", None) or {
+        "legal_coverage": "COVERED",
+        "subject_ref": {"event_id": "evt-anchor-7", "content_hash": "h" * 64,
+                        "occurred_at": "2026-09-10T12:00:00Z"},
+        "jurisdiction_id": "BR-SP",
+        "scale": "LOCAL",
+        "assessed_at": "2026-09-12T09:00:00Z",
+        "legal_basis_refs": [{"norm": "Lei 14.133/2021", "article": "art. 75, I",
+                              "version": "redacao original", "valid_from": "2021-04-01",
+                              "valid_until": None}],
+    }
+    kw = dict(event_type="legal.admissibility.assessed", producer_id="liceu.legal",
+              contract_id="liceu.legal.admissibility", contract_version="1.0.0",
+              causation_id="evt-anchor-7", payload=pay)
+    kw.update(over)
+    return _base(**kw)
+
+
+def _parecer_pay(**over):
+    base = _parecer()["payload"]
+    base.update(over)
+    return base
 
 
 def _lido(**kw):
@@ -1024,6 +1078,66 @@ CASOS = [
                "verified_signature": True, "verified_at": "x"})),
  ("ADV: assinatura de 64 chars ainda passa — LIMITE CONHECIDO", True,
   _humano()),
+
+ # --- liceu.legal.admissibility 1.0.0 (B1) ---
+ ("LEGAL parecer COVERED valido",
+  True, _parecer()),
+
+ ("LEGAL COVERED_WITH_CONDITIONS com conditions",
+  True, _parecer(payload=_parecer_pay(legal_coverage="COVERED_WITH_CONDITIONS",
+    conditions=[{"condition_id": "c1", "description": "licenca ambiental previa",
+                 "verifiable_by": "liceu.anchor"}]))),
+
+ ("LEGAL COVERED_WITH_CONDITIONS com conditions VAZIO (aprovacao disfarcada de cautela)",
+  False, _parecer(payload=_parecer_pay(legal_coverage="COVERED_WITH_CONDITIONS", conditions=[]))),
+
+ ("LEGAL COVERED_WITH_CONDITIONS sem conditions",
+  False, _parecer(payload=_parecer_pay(legal_coverage="COVERED_WITH_CONDITIONS"))),
+
+ ("LEGAL COVERED com conditions (condicoes so em COVERED_WITH_CONDITIONS)",
+  False, _parecer(payload=_parecer_pay(conditions=[{"condition_id": "c1", "description": "x"}]))),
+
+ ("LEGAL COVERED sem legal_basis_refs",
+  False, _parecer(payload=_parecer_pay(legal_basis_refs=[]))),
+
+ ("LEGAL NOT_APPLICABLE sem referencias",
+  True, _parecer(payload=_parecer_pay(legal_coverage="NOT_APPLICABLE", legal_basis_refs=[]))),
+
+ ("LEGAL NOT_APPLICABLE com legal_basis_refs",
+  False, _parecer(payload=_parecer_pay(legal_coverage="NOT_APPLICABLE"))),
+
+ ("LEGAL UNCOVERED sem referencias e valido",
+  True, _parecer(payload=_parecer_pay(legal_coverage="UNCOVERED", legal_basis_refs=[]))),
+
+ ("LEGAL norma com valid_from POSTERIOR ao fato (norma de hoje, nao da data do fato)",
+  False, _parecer(payload=_parecer_pay(legal_basis_refs=[{
+    "norm": "Lei X", "article": "art. 1", "version": "v2", "valid_from": "2026-09-11",
+    "valid_until": None}]))),
+
+ ("LEGAL norma revogada ANTES do fato",
+  False, _parecer(payload=_parecer_pay(legal_basis_refs=[{
+    "norm": "Lei Y", "article": "art. 2", "version": "v1", "valid_from": "2010-01-01",
+    "valid_until": "2026-09-01"}]))),
+
+ ("LEGAL assessed_at anterior ao fato",
+  False, _parecer(payload=_parecer_pay(assessed_at="2026-09-09T00:00:00Z"))),
+
+ ("LEGAL sem jurisdiction_id",
+  False, _parecer(payload={k: v for k, v in _parecer_pay().items() if k != "jurisdiction_id"})),
+
+ ("LEGAL parecer sobre si mesmo",
+  False, _parecer(event_id="evt-self-1",
+    payload=_parecer_pay(subject_ref={"event_id": "evt-self-1", "content_hash": "h" * 64,
+                                      "occurred_at": "2026-09-10T12:00:00Z"}))),
+
+ ("LEGAL scale do envelope diverge do parecer",
+  False, _parecer(scale="REGIONAL")),
+
+ ("LEGAL emitido pelo ARCHIMEDES (so liceu.legal afirma cobertura)",
+  False, _parecer(producer_id="liceu.archimedes")),
+
+ ("LEGAL carrega decision_id (JURIDICOTECH nao decide)",
+  False, _parecer(decision_id="d-legal-1")),
 ]
 
 

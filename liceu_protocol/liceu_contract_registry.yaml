@@ -1,10 +1,11 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.3.0
+  registry_version: 2.4.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
-  escopo: cadeia causal minima (5) + extensao CEA (2) = 7 contratos
+  escopo: cadeia causal minima (5) + extensao CEA (2) + decisao humana (1) + admissibilidade juridica (1)
+    = 9 contract_ids
   status: DEFINIDO — 0/7 implementados. Os 2 do CEA substituem wave83/wave92 e NAO foram aplicados ao
     codigo.
   regra: 'Contrato definido nao e contrato implementado. A promocao para implementado exige conformance
@@ -24,6 +25,9 @@ meta:
     por decisao: exigir forcaria preenchimento, e preenchimento sob pressao produz referencia inventada.
     Ausencia honesta e melhor que referencia falsa.'
   indexacao: contract_id -> contract_version -> definicao
+  changelog_2_4_0: 'MINOR: acrescenta liceu.legal.admissibility 1.0.0 (produtor liceu.legal ja existia
+    no Producer Registry sem contrato pelo qual publicar — CORE #32). Nenhum contrato existente
+    alterado. Da insumo ao invariante de legal_coverage do anchor.authorization 1.1.0 (CORE #33).'
   changelog_2_0_0: 'MAJOR: reestruturacao de indexacao. Antes contract_id -> UMA definicao; agora contract_id
     -> contract_version -> definicao. Necessario porque a Constituicao define identidade = (contract_id,
     contract_version) e o registry anterior nao conseguia servir duas versoes ao mesmo tempo — bump de
@@ -936,6 +940,184 @@ contracts:
       changelog_2_0_0: 'MAJOR: acrescenta 9 campos OBRIGATORIOS de autenticacao humana forte. Consumidor
         de 1.0.0 NAO satisfaz este contrato. Renumerado de 1.1.0 para 2.0.0 — acrescentar campo OPCIONAL
         e MINOR; acrescentar OBRIGATORIO e MAJOR.'
+  liceu.legal.admissibility:
+    1.0.0:
+      contract_version: 1.0.0
+      event_type: legal.admissibility.assessed
+      classification: AUTHORITATIVE_EVENT
+      posicao_na_cadeia: null
+      natureza: PARECER_TRANSVERSAL
+      owner: liceu.legal
+      allowed_producers:
+      - liceu.legal
+      required_envelope_fields:
+      - artifact_id
+      - trace_id
+      - causation_id
+      forbidden_envelope_fields:
+        decision_id: JURIDICOTECH avalia admissibilidade; nao decide (liceu.john)
+        governance_decision_id: JURIDICOTECH nao autoriza o ato avaliado (liceu.anchor). A capacidade
+          aprovacao_juridica_no_proprio_dominio e sobre o PARECER, nao sobre o ato.
+        execution_id: JURIDICOTECH nao executa (liceu.opera)
+      authority_invariants:
+      - o parecer e SOBRE subject_ref e nunca sobre si mesmo (subject_ref.event_id != event_id)
+      - causation_id aponta para o fato avaliado ou para o pedido de parecer; nunca para este evento
+      - scale do parecer <= liceu.legal.scale_max (REGIONAL no Producer Registry); acima disso o parecer
+        nao existe — o consumidor deriva UNCOVERED por construcao, nunca COVERED por omissao (P04)
+      - parecer nao e eterno; assessed_at obrigatorio. Quem consome decide a validade pela vigencia das
+        normas citadas (legal_basis_refs[].valid_until), nunca por prazo implicito
+      - legal_coverage e AFIRMACAO do liceu.legal; e o unico produtor que pode afirma-la. Qualquer outro
+        produtor so REFERENCIA este fato (anchor.authorization.legal_basis_refs)
+      domain_invariants:
+      - COVERED_WITH_CONDITIONS exige conditions nao vazio — codificado no schema (if/then), nao em prosa.
+        Condicional sem condicoes e aprovacao disfarcada de cautela
+      - conditions so existe com COVERED_WITH_CONDITIONS — schema
+      - COVERED e COVERED_WITH_CONDITIONS exigem legal_basis_refs nao vazio; NOT_APPLICABLE nao pode ter
+        legal_basis_refs — schema
+      - a norma de referencia e a VIGENTE NA DATA DO FATO, nao a de hoje. Cada legal_basis_ref cita norma,
+        artigo e versao com valid_from/valid_until; G5 exige valid_from <= subject_ref.occurred_at <=
+        valid_until
+      - assessed_at >= subject_ref.occurred_at — parecer nao antecede o fato (G5)
+      - jurisdiction_id obrigatorio — sem jurisdicao nao ha direito aplicavel
+      - scale no payload; se o envelope tambem carregar scale, os dois tem de coincidir (G5)
+      payload_schema:
+        type: object
+        required:
+        - legal_coverage
+        - subject_ref
+        - jurisdiction_id
+        - scale
+        - assessed_at
+        additionalProperties: false
+        properties:
+          legal_coverage:
+            type: string
+            enum:
+            - COVERED
+            - COVERED_WITH_CONDITIONS
+            - UNCOVERED
+            - NOT_APPLICABLE
+          subject_ref:
+            type: object
+            description: o fato ou ato avaliado — versao exata, com a data em que ocorreu
+            required:
+            - event_id
+            - content_hash
+            - occurred_at
+            additionalProperties: false
+            properties:
+              event_id:
+                type: string
+                minLength: 3
+              content_hash:
+                type: string
+                minLength: 32
+              occurred_at:
+                type: string
+                format: date-time
+          jurisdiction_id:
+            type: string
+            minLength: 2
+            description: 'ex.: BR, BR-SP, BR-SP-3550308 (ISO 3166 + IBGE quando municipal)'
+          scale:
+            type: string
+            enum:
+            - LOCAL
+            - REGIONAL
+            - CONTINENTAL
+            - GLOBAL
+            - CIVILIZACIONAL
+            - INTERPLANETARIA
+          assessed_at:
+            type: string
+            format: date-time
+          conditions:
+            type: array
+            items:
+              type: object
+              required:
+              - condition_id
+              - description
+              additionalProperties: false
+              properties:
+                condition_id:
+                  type: string
+                  minLength: 1
+                description:
+                  type: string
+                  minLength: 1
+                verifiable_by:
+                  type: string
+                  description: quem consegue verificar o cumprimento (producer_id ou papel)
+          legal_basis_refs:
+            type: array
+            items:
+              type: object
+              required:
+              - norm
+              - article
+              - version
+              - valid_from
+              additionalProperties: false
+              properties:
+                norm:
+                  type: string
+                  minLength: 1
+                article:
+                  type: string
+                  minLength: 1
+                version:
+                  type: string
+                  minLength: 1
+                  description: 'identificacao da redacao vigente (ex.: redacao dada pela Lei 14.133/2021)'
+                valid_from:
+                  type: string
+                  format: date
+                valid_until:
+                  type:
+                  - string
+                  - 'null'
+                  format: date
+                source_uri:
+                  type: string
+          reasoning:
+            type: string
+        allOf:
+        - if:
+            properties:
+              legal_coverage:
+                const: COVERED_WITH_CONDITIONS
+          then:
+            required:
+            - conditions
+            properties:
+              conditions:
+                minItems: 1
+          else:
+            properties:
+              conditions:
+                maxItems: 0
+        - if:
+            properties:
+              legal_coverage:
+                enum:
+                - COVERED
+                - COVERED_WITH_CONDITIONS
+          then:
+            required:
+            - legal_basis_refs
+            properties:
+              legal_basis_refs:
+                minItems: 1
+        - if:
+            properties:
+              legal_coverage:
+                const: NOT_APPLICABLE
+          then:
+            properties:
+              legal_basis_refs:
+                maxItems: 0
+      status: ACTIVE
 lineage_chain:
   descricao: 'Lida na vertical, esta tabela e a separacao de autoridade tornada verificavel. Nenhum produtor
     consegue emitir um campo de etapa que nao lhe pertence, entao a cadeia nao pode ser fabricada de tras
