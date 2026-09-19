@@ -34,7 +34,7 @@ import json
 import os
 import sys
 
-KIT_VERSION = "0.10.0"
+KIT_VERSION = "0.11.0"
 
 # Modo estrito: em certificacao, a ausencia de jsonschema deve FALHAR, nao
 # degradar para o motor interno. Degradacao silenciosa de validador e a mesma
@@ -312,6 +312,28 @@ def _g5(contract_id: str, p: dict, env: dict | None = None) -> None:
             raise Rejeicao("G5-LOCAL",
                 f"scale do envelope ({env.get('scale')}) != scale do parecer ({p.get('scale')})")
 
+    elif contract_id == "liceu.hub.planning-request":
+        # Pedido de planejamento (B2): o HUB registra a interacao; a origem
+        # humana esta em mandate_ref e tem de estar VIGENTE na data do pedido.
+        # O que o schema nao alcanca: relacao entre requested_at e a validade
+        # do mandato, e coerencia de scale envelope x payload.
+        mref = p.get("mandate_ref") or {}
+        quando = str(p.get("requested_at") or "")[:10]
+        desde = str(mref.get("valid_from") or "")[:10]
+        ate = mref.get("valid_until")
+        if desde > quando:
+            raise Rejeicao("G5-LOCAL",
+                f"mandate_ref.valid_from {desde} posterior ao pedido {quando}: mandato ainda nao vigente")
+        if ate and str(ate)[:10] < quando:
+            raise Rejeicao("G5-LOCAL",
+                f"mandate_ref.valid_until {str(ate)[:10]} anterior ao pedido {quando}: mandato expirado — "
+                f"pedido sob mandato expirado nao e pedido")
+        if env is not None and env.get("scale") not in (None, "") and env.get("scale") != p.get("scale"):
+            raise Rejeicao("G5-LOCAL",
+                f"scale do envelope ({env.get('scale')}) != scale do pedido ({p.get('scale')})")
+        if not str(p.get("problem_statement") or "").strip():
+            raise Rejeicao("G5-LOCAL", "problem_statement vazio: pedido sem problema e demanda sem origem")
+
     elif contract_id == "liceu.authority.human-decision":
         # A decisao humana e o caminho de MAIOR risco do ecossistema. Nao basta
         # exigir a chave: e preciso exigir o CONTEUDO.
@@ -469,6 +491,30 @@ def _humano(**over):
               source_event_id="s1", payload=pay)
     kw.update(over)
     return _base(**kw)
+
+
+def _pedido(**over):
+    """Pedido de planejamento valido (HUB, mandato vigente); over injeta o ataque."""
+    pay = over.pop("payload", None) or {
+        "planning_request_id": "pr-casa-liceu-001",
+        "mandate_ref": {"mandate_id": "mand-2026-017", "holder_id": "hub-user:messias.alves",
+                        "holder_kind": "HUMAN", "granted_by": "Diretoria LICEU — ato 2026/017",
+                        "valid_from": "2026-01-01", "valid_until": "2026-12-31"},
+        "requested_scope": {"territorial_scope": "REGION", "jurisdiction_id": "BR-SP"},
+        "problem_statement": "onde implantar a Casa LICEU P-001 na regiao metropolitana",
+        "requested_at": "2026-09-19T12:00:00Z",
+        "scale": "LOCAL",
+    }
+    kw = dict(event_type="hub.planning.requested", producer_id="liceu.hub",
+              contract_id="liceu.hub.planning-request", contract_version="1.0.0", payload=pay)
+    kw.update(over)
+    return _base(**kw)
+
+
+def _pedido_pay(**over):
+    base = _pedido()["payload"]
+    base.update(over)
+    return base
 
 
 def _parecer(**over):
@@ -1138,6 +1184,54 @@ CASOS = [
 
  ("LEGAL carrega decision_id (JURIDICOTECH nao decide)",
   False, _parecer(decision_id="d-legal-1")),
+
+ # --- liceu.hub.planning-request 1.0.0 (B2) ---
+ ("HUB pedido de planejamento valido, mandato vigente",
+  True, _pedido()),
+
+ ("HUB pedido SEM mandate_ref (pedido anonimo)",
+  False, _pedido(payload={k: v for k, v in _pedido_pay().items() if k != "mandate_ref"})),
+
+ ("HUB mandato EXPIRADO na data do pedido",
+  False, _pedido(payload=_pedido_pay(mandate_ref={
+    "mandate_id": "m", "holder_id": "h", "holder_kind": "HUMAN",
+    "valid_from": "2025-01-01", "valid_until": "2026-06-30"}))),
+
+ ("HUB mandato ainda NAO vigente na data do pedido",
+  False, _pedido(payload=_pedido_pay(mandate_ref={
+    "mandate_id": "m", "holder_id": "h", "holder_kind": "HUMAN", "valid_from": "2026-10-01"}))),
+
+ ("HUB mandato sem valid_until (indeterminado) e valido",
+  True, _pedido(payload=_pedido_pay(mandate_ref={
+    "mandate_id": "m", "holder_id": "h", "holder_kind": "HUMAN", "valid_from": "2026-01-01"}))),
+
+ ("HUB holder_kind fora do enum",
+  False, _pedido(payload=_pedido_pay(mandate_ref={
+    "mandate_id": "m", "holder_id": "h", "holder_kind": "AI_AGENT", "valid_from": "2026-01-01"}))),
+
+ ("HUB problem_statement vazio",
+  False, _pedido(payload=_pedido_pay(problem_statement="          "))),
+
+ ("HUB territorial_scope fora do vocabulario do elo 1",
+  False, _pedido(payload=_pedido_pay(requested_scope={"territorial_scope": "GALACTIC"}))),
+
+ ("HUB pedido com causation_id (pedido e raiz; nada o causou)",
+  False, _pedido(causation_id="c-alguem")),
+
+ ("HUB pedido com decision_id (HUB nao decide o que estudar)",
+  False, _pedido(decision_id="d-hub-1")),
+
+ ("HUB pedido emitido pelo JOHN (P03: a IA nao origina o que se estuda)",
+  False, _pedido(producer_id="liceu.john")),
+
+ ("HUB pedido emitido pelo ARCHIMEDES (quem estuda nao pede a si mesmo)",
+  False, _pedido(producer_id="liceu.archimedes")),
+
+ ("HUB scale do envelope diverge do pedido",
+  False, _pedido(scale="REGIONAL")),
+
+ ("HUB pedido nascido de recomendacao, com requerente humano, e valido",
+  True, _pedido(payload=_pedido_pay(source_recommendation_ref="evt-john-rec-9"))),
 ]
 
 
