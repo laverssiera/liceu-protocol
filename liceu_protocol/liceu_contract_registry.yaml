@@ -1,11 +1,11 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.4.0
+  registry_version: 2.5.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
-  escopo: cadeia causal minima (5) + extensao CEA (2) + decisao humana (1) + admissibilidade juridica (1)
-    = 9 contract_ids
+  escopo: pedido de planejamento (1) + cadeia causal minima (5) + extensao CEA (2) + decisao humana (1)
+    + admissibilidade juridica (1) = 10 contract_ids
   status: DEFINIDO — 0/7 implementados. Os 2 do CEA substituem wave83/wave92 e NAO foram aplicados ao
     codigo.
   regra: 'Contrato definido nao e contrato implementado. A promocao para implementado exige conformance
@@ -25,6 +25,18 @@ meta:
     por decisao: exigir forcaria preenchimento, e preenchimento sob pressao produz referencia inventada.
     Ausencia honesta e melhor que referencia falsa.'
   indexacao: contract_id -> contract_version -> definicao
+  changelog_2_5_0: 'MINOR (decisao B2, 2026-09-19): acrescenta liceu.hub.planning-request 1.0.0 — o
+    pedido de planejamento territorial que o elo 1 exigia (planning_request_id) sem que ninguem o
+    emitisse. Quem emite e o HUB, como FATO DE INTERACAO: o HUB nao possui o territorio nem decide o
+    que estudar, mas possui o fato de que alguem, identificado e com mandato (mandate_ref), pediu — e
+    ja e a porta unica de atendimento. Alternativas consideradas e descartadas: JOHN central (P03 —
+    a IA originaria o que o ecossistema estuda, e sintetizaria a resposta ao proprio pedido); humano
+    direto (individuo nao e produtor; origina, mas precisa de quem registre); liceu.mandate (novo
+    plano, posicao 0, P08, Constituicao 1.16.0 — certo se mandato originar outras coisas alem de
+    planejar; hoje nenhum produtor declara isso, e seria um produtor com um contrato so). A opcao
+    HUB se desfaz com DEPRECATED; a alternativa exigiria desfazer uma versao constitucional.
+    Constituicao 1.15.0 INTOCADA. Nenhum contrato existente alterado. Corrige contagem (estava 8/10
+    desde 2.3.0).'
   changelog_2_4_0: 'MINOR: acrescenta liceu.legal.admissibility 1.0.0 (produtor liceu.legal ja existia
     no Producer Registry sem contrato pelo qual publicar — CORE #32). Nenhum contrato existente
     alterado. Da insumo ao invariante de legal_coverage do anchor.authorization 1.1.0 (CORE #33).'
@@ -39,8 +51,8 @@ meta:
     REGRA: aposentadoria bloqueia ESCRITA, nunca LEITURA. Se RETIRED bloqueasse leitura, eventos historicos
       deixariam de validar e a historia se tornaria irreconstruivel.
   contagem:
-    contract_ids: 8
-    versoes: 10
+    contract_ids: 10
+    versoes: 12
   nota_ramificacao: 'liceu.authority.human-decision NAO tem posicao_na_cadeia: e ramificacao de contingencia,
     nao elo sequencial'
 compatibility_policy:
@@ -1117,6 +1129,149 @@ contracts:
             properties:
               legal_basis_refs:
                 maxItems: 0
+      status: ACTIVE
+  liceu.hub.planning-request:
+    1.0.0:
+      contract_version: 1.0.0
+      event_type: hub.planning.requested
+      classification: AUTHORITATIVE_EVENT
+      posicao_na_cadeia: null
+      precede_elo: 1
+      natureza: FATO_DE_INTERACAO
+      owner: liceu.hub
+      allowed_producers:
+      - liceu.hub
+      required_envelope_fields:
+      - artifact_id
+      - trace_id
+      forbidden_envelope_fields:
+        causation_id: 'o pedido e RAIZ da cadeia — nada o causou dentro do ecossistema; quem o origina esta
+          em mandate_ref, nao em lineage'
+        decision_id: o HUB registra o pedido; nao decide o que estudar (liceu.john nao origina — P03)
+        governance_decision_id: o HUB nao autoriza (liceu.anchor / liceu.authority)
+        execution_id: o HUB nao executa (liceu.opera)
+      authority_invariants:
+      - a interacao e fato proprio do HUB; o CONTEUDO pedido nao e — o HUB nao afirma onde nem por que
+        atuar, so que foi pedido, por quem, com que mandato e ate que alcance
+      - mandate_ref e obrigatorio — sem ele o HUB registra pedido anonimo e o ARCHIMEDES estuda sob
+        demanda sem origem. holder_id e a identidade do requerente conforme o HUB a autenticou; o HUB
+        e a porta unica de atendimento (JOHN_triagem = HUB)
+      - o HUB nao e liceu.john — o pedido nunca vem de sintese cognitiva; se a origem for uma
+        recomendacao, ela e referenciada em source_recommendation_ref e o requerente humano continua
+        sendo quem pede
+      - scale do pedido <= scale_max de liceu.hub (INTERPLANETARIA) — mandato de alcance; nao e alcada
+      - 'o elo 1 (archimedes.planning-state) consome este fato: payload.planning_request_id do elo 1 ==
+        payload.planning_request_id deste evento, e causation_id do elo 1 aponta para este event_id'
+      domain_invariants:
+      - 'mandato VIGENTE na data do pedido — mandate_ref.valid_from <= requested_at <= valid_until (G5).
+        Pedido sob mandato expirado nao e pedido'
+      - planning_request_id e deterministico por (holder_id, requested_at, requested_scope) — dois
+        pedidos iguais sao um pedido
+      - problem_statement nao vazio — pedido sem problema e demanda sem origem
+      - 'requested_scope.territorial_scope no enum do elo 1 (SITE..PLANETARY): o HUB pede no vocabulario
+        de quem vai estudar'
+      payload_schema:
+        type: object
+        required:
+        - planning_request_id
+        - mandate_ref
+        - requested_scope
+        - problem_statement
+        - requested_at
+        - scale
+        additionalProperties: false
+        properties:
+          planning_request_id:
+            type: string
+            minLength: 1
+          mandate_ref:
+            type: object
+            description: quem pediu e sob que mandato — a origem humana do pedido
+            required:
+            - mandate_id
+            - holder_id
+            - holder_kind
+            - valid_from
+            additionalProperties: false
+            properties:
+              mandate_id:
+                type: string
+                minLength: 1
+              holder_id:
+                type: string
+                minLength: 1
+                description: identidade do requerente conforme autenticada pelo HUB
+              holder_kind:
+                type: string
+                enum:
+                - HUMAN
+                - ORGANIZATION
+              granted_by:
+                type: string
+                description: quem conferiu o mandato (orgao, contrato, ato)
+              valid_from:
+                type: string
+                format: date
+              valid_until:
+                type:
+                - string
+                - 'null'
+                format: date
+              evidence_uri:
+                type: string
+          requested_scope:
+            type: object
+            required:
+            - territorial_scope
+            additionalProperties: false
+            properties:
+              territorial_scope:
+                type: string
+                enum:
+                - SITE
+                - REGION
+                - TERRITORY
+                - CONTINENTAL
+                - PLANETARY
+              jurisdiction_id:
+                type: string
+                minLength: 2
+              geometry_ref:
+                type: string
+                description: referencia a geometria (artifact_id ou URI), nunca a geometria inline
+              crs:
+                type: string
+          problem_statement:
+            type: string
+            minLength: 10
+          objectives:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          constraints:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          source_recommendation_ref:
+            type:
+            - string
+            - 'null'
+            description: event_id de john.recommendation.generated se o pedido nasceu de uma recomendacao;
+              o requerente humano continua sendo quem pede
+          requested_at:
+            type: string
+            format: date-time
+          scale:
+            type: string
+            enum:
+            - LOCAL
+            - REGIONAL
+            - CONTINENTAL
+            - GLOBAL
+            - CIVILIZACIONAL
+            - INTERPLANETARIA
       status: ACTIVE
 lineage_chain:
   descricao: 'Lida na vertical, esta tabela e a separacao de autoridade tornada verificavel. Nenhum produtor

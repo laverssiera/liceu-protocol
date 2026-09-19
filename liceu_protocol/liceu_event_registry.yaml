@@ -7,10 +7,10 @@ meta:
     classificacao no ledger + schema + SemVer + dono constitucional. Este registry e a FONTE dos conformance
     tests.'
   promocao: discovery -> ledger (classificado) -> registry (canonico) -> conformance
-  contract_registry_sha256: e4210a954100da3b2e7c06862de7b6fb25d499b41ea63a437c14225858e7cb5a
+  contract_registry_sha256: 26e9e363223239e03fe622edafea962c61992574e1b0712f9ea6408d248a9700
   constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
     ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
-  versao: 1.5.0
+  versao: 1.6.0
   nota_versao: campo unico e monotonico. Antes havia registry_version=1.1.0 e versao=1.2.0 simultaneos,
     e a versao anterior (1.3.0) era superior a nova declarada.
 events:
@@ -122,8 +122,28 @@ events:
     contract_lifecycle: ACTIVE
     nota: parecer de admissibilidade juridica sobre um fato de qualquer elo; e o insumo que anchor.authorization
       referencia em legal_basis_refs. Quem publica e o JURIDICOTECH (outro PR, outro repo).
+  hub.planning.requested:
+    owner: liceu.hub
+    allowed_producers:
+    - liceu.hub
+    classification: AUTHORITATIVE_EVENT
+    contract_id: liceu.hub.planning-request
+    contract_version: 1.0.0
+    payload_schema: liceu_contract_registry.yaml#/contracts/liceu.hub.planning-request/payload_schema
+    transport:
+      canonical_publish: http
+      asynchronous_propagation: nats_jetstream
+    implementation_status: DECLARED_BUT_NOT_IMPLEMENTED
+    conformance_tests: []
+    posicao_na_cadeia: null
+    precede_elo: 1
+    natureza: FATO_DE_INTERACAO
+    contract_lifecycle: ACTIVE
+    nota: 'o pedido de planejamento que o elo 1 exigia (planning_request_id) sem emissor. Decisao B2
+      (2026-09-19): o HUB emite como fato de interacao, com mandate_ref obrigatorio. Quem publica e o
+      HUB (outro PR, outro repo); o ARCHIMEDES passa a nomear liceu.hub como dono do BLOCKED.'
 resumo:
-  CANONICAL_REGISTRY_EVENTS: 7
-  CONTRACT_IDS: 9
-  CONTRACT_VERSIONS: 11
+  CANONICAL_REGISTRY_EVENTS: 8
+  CONTRACT_IDS: 10
+  CONTRACT_VERSIONS: 12
   IMPLEMENTED_IN_MONOLITH: 0
