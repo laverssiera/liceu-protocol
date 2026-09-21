@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.5.0
+  registry_version: 2.5.1
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -25,6 +25,10 @@ meta:
     por decisao: exigir forcaria preenchimento, e preenchimento sob pressao produz referencia inventada.
     Ausencia honesta e melhor que referencia falsa.'
   indexacao: contract_id -> contract_version -> definicao
+  changelog_2_5_1: 'PATCH (2026-09-21, ciclo 6): liceu.anchor.authorization 1.1.0 ganha o invariante EPOCA —
+    a autorizacao carrega a epoca em que foi autorizada (carimbo do CORE), nao a da causa; copiar a
+    epoca da causa e 409. Texto apenas: nomeia o fencing do F1 que ja existe e e testado. Nenhum
+    schema, campo ou status alterado.'
   changelog_2_5_0: 'MINOR (decisao B2, 2026-09-19): acrescenta liceu.hub.planning-request 1.0.0 — o
     pedido de planejamento territorial que o elo 1 exigia (planning_request_id) sem que ninguem o
     emitisse. Quem emite e o HUB, como FATO DE INTERACAO: o HUB nao possui o territorio nem decide o
@@ -369,6 +373,13 @@ contracts:
       - 'nao autoriza a si proprio: producer da causa != producer deste evento'
       - subject_ref liga a autorizacao ao objeto EXATO aprovado (hash + versao)
       - 'deny-by-default: ausencia de autorizacao nao e autorizacao'
+      - 'EPOCA: a autorizacao carrega a epoca em que foi autorizada, nao a da causa. authority_epoch e
+        campo de ENVELOPE carimbado pelo CORE com a epoca vigente no aceite (control plane); o produtor
+        nao o preenche. Se a epoca avancou entre a recomendacao (causa) e a autorizacao, a autorizacao
+        e aceita sob a epoca NOVA e a linhagem atravessa a promocao. Copiar a epoca da causa para o
+        envelope e REJEITADO (409 authority_epoch_stale) — e o fencing do F1, ja em codigo e testado
+        (test_stale_epoch_is_rejected_even_with_instance_online). Este invariante NOMEIA comportamento
+        existente; nao descreve derivacao (decidido 2026-09-21, ciclo 6).'
       - legal_basis_refs e REFERENCIA, nunca afirmacao. O ANCHOR tem autoridade institucional, nao juridica;
         declarar cobertura seria autoridade fabricada.
       - 'legal_coverage e derivado pelo CORE: COVERED se as referencias resolvem para fatos do liceu.legal;

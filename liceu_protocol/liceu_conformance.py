@@ -34,7 +34,7 @@ import json
 import os
 import sys
 
-KIT_VERSION = "0.12.0"
+KIT_VERSION = "0.12.1"
 
 # Modo estrito: em certificacao, a ausencia de jsonschema deve FALHAR, nao
 # degradar para o motor interno. Degradacao silenciosa de validador e a mesma
