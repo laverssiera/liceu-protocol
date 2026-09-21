@@ -57,6 +57,35 @@ O invariante foi extraido. O codigo de origem nao foi copiado, nem a divida
 incidental dos repositorios de origem.
 
 =============================================================================
+IDENTIDADE DO FATO  (ADR-002, decidido 2026-09-21 — SDK 0.5.0)
+=============================================================================
+
+O mesmo ato publicado duas vezes e UM fato. Ate 0.4.0 o SDK gerava
+`event_id = uuid4()` a cada publish e o boundary deduplicava por `event_id`:
+dois pedidos identicos viravam dois fatos (CORE #47, visto no primeiro fato
+real do ecossistema).
+
+A partir de 0.5.0 o `event_id` e DERIVADO DA IDENTIDADE do fato:
+
+    event_id = uuid5(FACT_IDENTITY_NAMESPACE,
+                     producer_id | contract_id | contract_version | artifact_id)
+
+E a tupla que a Constituicao ja declara como invariante do envelope canonico
+(`envelope_canonico.invariante`). Identidade, NAO conteudo: derivar de
+`payload_hash` faria dois payloads diferentes com o mesmo `artifact_id`
+virarem dois fatos — o oposto do invariante.
+
+Ha UMA definicao de identidade, e ela vive aqui. O CORE nao deriva: aplica —
+chave igual + `payload_hash` igual -> replay (200, `idempotent: true`);
+chave igual + `payload_hash` diferente -> 409 (`CollisionError`). Sem essa
+guarda no CORE, um `event_id` deterministico DESCARTARIA ato novo em
+silencio; por isso a guarda entra antes desta versao ser consumida.
+
+`artifact_id` e o que o produtor declara como identidade do ato. Se o ato
+tem versao (ARCHIMEDES: `<state_id>:<state_version>`), a versao faz parte.
+`artifact_id` vazio nao e "sem deduplicacao": e erro.
+
+=============================================================================
 UM FATO, DOIS CAMINHOS
 =============================================================================
 
@@ -79,7 +108,7 @@ import datetime
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-SDK_VERSION = "0.4.0"
+SDK_VERSION = "0.5.0"
 
 # Variaveis canonicas. Aliases sao PROIBIDOS: ARCHIMEDES aceitava
 # FEDERATION_API_URL / CANONICAL_SERVICE_SECRET, que nenhum outro monolito
@@ -202,6 +231,34 @@ def envelope_fingerprint(envelope: dict) -> str:
     return hashlib.sha256(canonical_json(base)).hexdigest()
 
 
+# Namespace fixo da identidade do fato (ADR-002). Trocar isto muda o event_id
+# de TODO fato do ecossistema: e emenda de protocolo, nunca ajuste.
+FACT_IDENTITY_NAMESPACE = uuid.UUID("c12e8bee-0673-5acb-bcc3-c01a431c838f")
+
+
+def fact_identity(producer_id: str, contract_id: str, contract_version: str,
+                  artifact_id: str) -> str:
+    """A tupla constitucional do envelope canonico, em uma linha.
+
+    E a UNICA definicao de "mesmo fato" no ecossistema. O CORE nao a
+    recalcula; verifica consistencia de conteudo sob a chave que recebe.
+    """
+    for nome, valor in (("producer_id", producer_id), ("contract_id", contract_id),
+                        ("contract_version", contract_version), ("artifact_id", artifact_id)):
+        if not isinstance(valor, str) or not valor.strip():
+            raise ConformanceError(
+                f"{nome} vazio: sem identidade nao ha fato (ADR-002)")
+    return f"{producer_id}|{contract_id}|{contract_version}|{artifact_id}"
+
+
+def derive_event_id(producer_id: str, contract_id: str, contract_version: str,
+                    artifact_id: str) -> str:
+    """event_id deterministico: o mesmo ato produz o mesmo id, sempre."""
+    return str(uuid.uuid5(FACT_IDENTITY_NAMESPACE,
+                          fact_identity(producer_id, contract_id,
+                                        contract_version, artifact_id)))
+
+
 # ---------------------------------------------------------------------------
 # Resolucao de contrato — cache de pre-voo, NUNCA autoridade
 # ---------------------------------------------------------------------------
@@ -276,6 +333,20 @@ class PublishResult:
     jetstream_subject: str | None
     jetstream_ack: bool
     envelope: dict = field(repr=False, default_factory=dict)
+    # kit #6 (0.5.0): o corpo da resposta do CORE deixa de ser descartado.
+    # `idempotent` e None quando o servidor nao o informou — o produtor NAO
+    # deve ler None como "fato novo".
+    idempotent: bool | None = None
+    violations: list = field(default_factory=list)
+    conformance: dict = field(repr=False, default_factory=dict)
+
+    @property
+    def outcome(self) -> str:
+        """PUBLISHED | REPLAYED | UNKNOWN — pelo corpo, nunca pelo status HTTP
+        (o CORE devolve 200 nos dois casos; ARCHIMEDES #26, HUB #9)."""
+        if self.idempotent is None:
+            return "UNKNOWN"
+        return "REPLAYED" if self.idempotent else "PUBLISHED"
 
 
 @dataclass
@@ -332,9 +403,17 @@ class FederationClient:
     def build_envelope(self, contract_id: str, payload: dict,
                        artifact_id: str, *, trace_id: str | None = None,
                        lineage: dict | None = None,
-                       observed_at: str | None = None) -> dict:
+                       observed_at: str | None = None,
+                       event_id: str | None = None) -> dict:
         cfg = self.cfg
         ct = self.resolver.resolve(contract_id, cfg)
+
+        # Identidade ANTES de qualquer outra coisa (ADR-002): sem artifact_id
+        # nao ha fato. `event_id=` e o gancho para quem deriva por regra
+        # propria (era a subclasse DeterministicFederationClient do
+        # ARCHIMEDES); o default e a regra do protocolo.
+        fact_event_id = event_id or derive_event_id(
+            cfg.producer_id, contract_id, ct["contract_version"], artifact_id)
 
         # Autoridade verificada ANTES de construir. G3 tambem revalida, mas
         # falhar aqui produz erro mais claro para quem chama.
@@ -345,7 +424,7 @@ class FederationClient:
 
         agora = datetime.datetime.now(datetime.timezone.utc).isoformat()
         env: dict[str, Any] = {
-            "event_id": str(uuid.uuid4()),
+            "event_id": fact_event_id,
             "event_type": ct["event_type"],
             "producer_id": cfg.producer_id,
             "contract_id": contract_id,
@@ -562,6 +641,15 @@ class FederationClient:
                 f"publicacao canonica falhou: HTTP {r.get('status')} "
                 f"{r.get('body', '')}")
 
+        # kit #6: o corpo diz se foi fato novo ou replay, e o que o
+        # conformance do CORE viu. Ate 0.4.0 isto era descartado e o produtor
+        # rotulava pelo status HTTP — errado, porque o CORE devolve 200 nos
+        # dois casos.
+        corpo_resp = r.get("body") if isinstance(r.get("body"), dict) else {}
+        idempotent = corpo_resp.get("idempotent")
+        conformance = corpo_resp.get("conformance") if isinstance(corpo_resp.get("conformance"), dict) else {}
+        violations = list(conformance.get("violations") or [])
+
         # MESMO fato pelo segundo caminho. Nao ha novo event_id, nao ha novo
         # fingerprint, nao ha nova identidade.
         subject, ack = None, False
@@ -576,6 +664,9 @@ class FederationClient:
             jetstream_subject=subject,
             jetstream_ack=ack,
             envelope=env,
+            idempotent=bool(idempotent) if idempotent is not None else None,
+            violations=violations,
+            conformance=conformance,
         )
 
 
@@ -940,6 +1031,120 @@ def _self_test() -> int:
 
     colidir["ativo"] = False
     caso("apos a colisao cessar, publicacao volta a funcionar", True, _pub_c)
+
+    # -- identidade do fato (ADR-002, SDK 0.5.0) -----------------------------
+    def _rec(artifact, resumo="x", **kw):
+        return cli_r.publish("liceu.john.recommendation",
+            {"alternatives": [{"alternative_id": "A", "summary": resumo},
+                              {"alternative_id": "B", "summary": "y"}],
+             "recommended_alternative_id": "A", "confidence": 0.8,
+             "rationale": [{"factor": "c", "weight": 1}],
+             "evidence_refs": ["e1"]},
+            artifact, lineage={"causation_id": "c1", "decision_id": "d1"}, **kw)
+
+    ra = _rec("art-id-1")
+    rb = _rec("art-id-1")
+    rc = _rec("art-id-2")
+    esperado = derive_event_id(cfg.producer_id, "liceu.john.recommendation",
+                               ra.envelope["contract_version"], "art-id-1")
+    ok_det = ra.event_id == rb.event_id == esperado and rc.event_id != ra.event_id
+    resultados.append(("mesmo ato -> mesmo event_id; ato diferente -> outro", ok_det))
+    print(f"  [{'OK  ' if ok_det else 'FALHA'}] identidade   "
+          f"event_id derivado de producer|contract|version|artifact_id")
+    print(f"           {ra.event_id[:8]} == {rb.event_id[:8]} != {rc.event_id[:8]}")
+
+    # identidade e sobre o ATO, nao sobre o conteudo: conteudo diferente com o
+    # mesmo artifact_id produz o MESMO event_id (e e o CORE quem recusa, 409)
+    rd_env = cli_r.build_envelope("liceu.john.recommendation",
+        {"alternatives": [{"alternative_id": "A", "summary": "OUTRO"},
+                          {"alternative_id": "B", "summary": "y"}],
+         "recommended_alternative_id": "A", "confidence": 0.8,
+         "rationale": [{"factor": "c", "weight": 1}],
+         "evidence_refs": ["e1"]},
+        "art-id-1", lineage={"causation_id": "c1", "decision_id": "d1"})
+    ok_conteudo = rd_env["event_id"] == ra.event_id and rd_env["payload_hash"] != ra.envelope["payload_hash"]
+    resultados.append(("identidade nao depende do conteudo", ok_conteudo))
+    print(f"  [{'OK  ' if ok_conteudo else 'FALHA'}] identidade   "
+          f"payload diferente, mesmo artifact_id -> mesmo event_id (o 409 e do CORE)")
+
+    rx = _rec("art-id-3", event_id="11111111-2222-5333-8444-555555555555")
+    ok_gancho = rx.event_id == "11111111-2222-5333-8444-555555555555" \
+        and envelope_fingerprint(rx.envelope) == rx.envelope_fingerprint
+    resultados.append(("event_id= explicito prevalece e o fingerprint o cobre", ok_gancho))
+    print(f"  [{'OK  ' if ok_gancho else 'FALHA'}] gancho       "
+          f"event_id explicito substitui a derivacao (sem subclasse)")
+
+    caso("artifact_id vazio -> sem identidade, sem fato", False,
+         lambda: _rec(""))
+
+    # -- corpo da resposta (kit #6) ----------------------------------------
+    # Servidor que se comporta como o CORE com a guarda do ADR-002:
+    # chave = event_id; mesmo hash -> replay; hash diferente -> 409.
+    guardado: dict = {}
+
+    def http_core_guarda(metodo, url, body, cfg):
+        if metodo == "POST" and "/federation/events/publish" in url:
+            ph = payload_hash(body["payload"])
+            antigo = guardado.get(body["event_id"])
+            if antigo is not None and antigo != ph:
+                return {"status": 409, "body": {
+                    "detail": "event_id_collision_divergent_semantics",
+                    "event_id": body["event_id"],
+                    "diverging_fields": ["payload_hash"],
+                    "conflict_token": hashlib.sha256((antigo + ph).encode()).hexdigest()[:16],
+                    "hint": "mesma identidade, conteudo diferente"}}
+            replay = antigo is not None
+            guardado[body["event_id"]] = ph
+            return {"status": 200, "body": {
+                "status": "published", "idempotent": replay,
+                "conformance": {"mode": "ALERT", "valid": True, "violations": []}}}
+        return http_com_leitura(metodo, url, body, cfg)
+
+    cli_g = FederationClient(cfg, ContractResolver(cr, http_core_guarda), conf, cr,
+                             http_core_guarda, jetstream)
+
+    def _g(artifact, resumo="x"):
+        return cli_g.publish("liceu.john.recommendation",
+            {"alternatives": [{"alternative_id": "A", "summary": resumo},
+                              {"alternative_id": "B", "summary": "y"}],
+             "recommended_alternative_id": "A", "confidence": 0.8,
+             "rationale": [{"factor": "c", "weight": 1}],
+             "evidence_refs": ["e1"]},
+            artifact, lineage={"causation_id": "c1", "decision_id": "d1"})
+
+    g1 = _g("art-g")
+    g2 = _g("art-g")
+    ok_corpo = (g1.idempotent is False and g1.outcome == "PUBLISHED"
+                and g2.idempotent is True and g2.outcome == "REPLAYED"
+                and g1.event_id == g2.event_id and g2.violations == []
+                and g1.http_status == g2.http_status == 200)
+    resultados.append(("PublishResult le idempotent/violations do corpo", ok_corpo))
+    print(f"  [{'OK  ' if ok_corpo else 'FALHA'}] corpo        "
+          f"1o publish PUBLISHED, 2o REPLAYED — mesmo HTTP 200, mesmo event_id")
+
+    try:
+        _g("art-g", resumo="conteudo NOVO"); col2 = None
+    except CollisionError as e:
+        col2 = e
+    ok_409 = bool(col2) and col2.diverging_fields == ["payload_hash"] \
+        and col2.event_id == g1.event_id
+    resultados.append(("mesma identidade, conteudo diferente -> 409 -> CollisionError", ok_409))
+    print(f"  [{'OK  ' if ok_409 else 'FALHA'}] guarda       "
+          f"ato diferente sob a mesma identidade e recusado, nao silenciado")
+
+    # servidor antigo (sem corpo): idempotent e None, outcome UNKNOWN — nunca
+    # "PUBLISHED" por otimismo
+    r_old = cli.publish("liceu.john.recommendation",
+        {"alternatives": [{"alternative_id": "A", "summary": "x"},
+                          {"alternative_id": "B", "summary": "y"}],
+         "recommended_alternative_id": "A", "confidence": 0.8,
+         "rationale": [{"factor": "c", "weight": 1}],
+         "evidence_refs": ["e1"]},
+        "art-old", lineage={"causation_id": "c1", "decision_id": "d1"})
+    ok_unknown = r_old.idempotent is None and r_old.outcome == "UNKNOWN"
+    resultados.append(("servidor sem corpo -> outcome UNKNOWN, nao PUBLISHED", ok_unknown))
+    print(f"  [{'OK  ' if ok_unknown else 'FALHA'}] fail-closed  "
+          f"sem `idempotent` na resposta o SDK nao afirma fato novo")
 
     acertos = sum(1 for _, ok in resultados if ok)
     print(f"\n{acertos}/{len(resultados)} casos corretos")
