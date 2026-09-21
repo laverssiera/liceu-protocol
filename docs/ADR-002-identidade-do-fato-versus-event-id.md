@@ -1,6 +1,6 @@
 # ADR-002 — Identidade do fato versus `event_id`
 
-**Estado:** proposta em 2026-09-20. Sem decisão. As três saídas estão levantadas com custo; a escolha é de protocolo.
+**Estado:** proposta em 2026-09-20; **corrigida em 2026-09-21** (o 409 que a primeira versão dava como existente não existe — ver §Contexto). Sem decisão. As três saídas estão levantadas com custo; a escolha é de protocolo.
 **Origem:** CORE #47, aberto pelo primeiro fato real (1/5, `docs/evidence/2026-09-20-primeiro-fato-1of5.md` no CORE).
 
 ```
@@ -23,7 +23,16 @@ return f"semantic:{sha256(...)}"                   # nunca alcançado pelo SDK
 
 Dois detalhes que pesam nas saídas: o ramo semântico existe, mas (a) só é alcançado quando o envelope não tem `event_id`, o que o SDK nunca produz, e (b) inclui `trace_id`, que o SDK também gera aleatório — logo, mesmo que fosse alcançado, não deduplicaria duas publicações do mesmo fato.
 
-O CORE já tem a proteção complementar: mesmo `event_id` com semântica divergente é **409** (`_same_federation_semantics`, main.py:1341; `CollisionError` no SDK). Ou seja, o boundary sabe recusar "dois conteúdos com a mesma identidade"; o que ele não sabe é reconhecer "o mesmo conteúdo com duas identidades".
+**O CORE NÃO tem 409 para colisão de `event_id`.** A primeira versão deste ADR afirmava o contrário, citando `_same_federation_semantics` (main.py:1341). Lido linha a linha, o caminho é outro:
+
+- `_same_federation_semantics` compara `event_id, event_type, producer, scope, artifact_id, source_event_id, causation_id, trace_id, contract_version` — **não compara `payload` nem `payload_hash`**. Serve de filtro para devolver o registro existente como replay (main.py:5476–5500), não de guarda.
+- `emit` (`orchestration_runtime.py:118–122` e `134–138`): chave de idempotência já existente → **devolve a linha antiga** com `_idempotent_replay = True`. Nenhuma comparação de conteúdo. Nenhum erro.
+- `grep 409` em `main.py`: só card estratégico e workspace. O endpoint `/federation/events/publish` (main.py:5394) só levanta 422 e o status de rejeição do conformance.
+- O teste que existe (`tests/test_liceu_db_core.py:329`) publica o MESMO corpo duas vezes, sem `event_id` — o ramo semântico, que o SDK nunca alcança.
+
+Consequência: mesmo `event_id` com conteúdo diferente → HTTP 200, `idempotent: true`, e o registro devolvido é o **antigo**. O conteúdo novo é descartado em silêncio. O `CollisionError` do SDK (`liceu_federation_sdk.py:104`, tratamento em `:541`) trata um 409 que o CORE nunca emite.
+
+Isto muda o peso das saídas: hoje o defeito é "dois fatos para um ato" (duplicata, visível no store). Com `event_id` determinístico e SEM guarda no CORE, o defeito vira "um ato novo com a mesma identidade some" (silêncio, invisível). **Qualquer saída que fixe a identidade precisa do 409 no CORE junto** — `idempotency_key` igual + `payload_hash` diferente → 409 — ou troca um defeito visível por um invisível.
 
 **No SDK** (`liceu_federation_sdk.py:348`, kit 0.11.0 / federation_sdk 0.4.0): `"event_id": str(uuid.uuid4())`. `build_envelope(contract_id, payload, artifact_id, *, trace_id, lineage, observed_at)` — **não há parâmetro `event_id`**.
 
@@ -59,13 +68,13 @@ O boundary deriva a chave de idempotência de `(producer, contract_id, contract_
 
 ### B — `event_id` determinístico no SDK
 
-O SDK deriva `event_id = uuid5(NS, "{producer}|{contract_id}|{contract_version}|{artifact_id}")` por default, com parâmetro `event_id=` para o produtor sobrescrever (o gancho que o ARCHIMEDES teve de criar por subclasse). Sem `artifact_id` → `uuid4`, explicitamente: quem não declara identidade não recebe deduplicação.
+O SDK deriva `event_id = uuid5(NS, "{producer}|{contract_id}|{contract_version}|{artifact_id}")` por default, com parâmetro `event_id=` para o produtor sobrescrever (o gancho que o ARCHIMEDES teve de criar por subclasse). `artifact_id` vazio → erro, não `uuid4`: o envelope canônico já o exige (abaixo).
 
-Ponto de desenho que a leitura "derivar do conteúdo" esconde: derivar de `payload_hash` faria dois payloads diferentes com o mesmo `planning_request_id` virarem dois fatos — o oposto do invariante. Derivar da **identidade** (`artifact_id`) faz o segundo publish com conteúdo divergente cair no **409 que o CORE já tem**. O 409 é o que torna a saída B segura: colisão de identidade com conteúdo diferente é recusada, não silenciada. (O ARCHIMEDES inclui `content_hash` porque seu `artifact_id` já carrega a versão; com a derivação por identidade, o resultado é o mesmo.)
+Ponto de desenho que a leitura "derivar do conteúdo" esconde: derivar de `payload_hash` faria dois payloads diferentes com o mesmo `planning_request_id` virarem dois fatos — o oposto do invariante. Derivar da **identidade** (`artifact_id`) faz o segundo publish com conteúdo divergente colidir na chave — e aí o CORE precisa **recusar (409)**, o que hoje ele não faz (ver §Contexto: devolve o antigo como replay). Sem esse 409, B é **pior** que o estado atual: a duplicata some, e com ela o conteúdo novo. B é, portanto, **duas mudanças**: derivação no SDK + guarda no CORE (`idempotency_key` igual, `payload_hash` diferente → 409). O SDK já está pronto para o 409 (`CollisionError`); o CORE não o emite. (O ARCHIMEDES inclui `content_hash` na derivação, o que faz conteúdo novo virar `event_id` novo — evita a colisão em vez de detectá-la; com o 409 no CORE, isso deixa de ser necessário.)
 
 | | |
 |---|---|
-| muda | o SDK (`build_envelope`: derivação + parâmetro `event_id`) e, por consequência, todo produtor que o use ao atualizar o kit |
+| muda | o SDK (`build_envelope`: derivação + parâmetro `event_id`) e, por consequência, todo produtor que o use ao atualizar o kit. **E o CORE**: guarda de 409 em `/federation/events/publish` (chave igual + `payload_hash` diferente), com teste — hoje inexistente |
 | o que quebra | ARCHIMEDES: a subclasse `DeterministicFederationClient` vira redundante (remover; comportamento igual). HUB e FORNECEDORES: nada quebra — passam a receber replay onde hoje recebem duplicata. Testes que afirmam "dois publishes = dois `event_id`" (nenhum conhecido) |
 | MAJOR? | assinatura: aditiva (parâmetro opcional) → MINOR. Semântica: o default muda de "cada publish é um fato" para "cada identidade é um fato" — é exatamente a correção, mas é mudança de comportamento observável. Proposta honesta: **federation_sdk 0.4.0 → 0.5.0 com changelog explícito**, e a Constituição ganhando a frase da identidade. Se o critério for "comportamento default mudou", é MAJOR (1.0.0). A decisão de rótulo é do dono do kit |
 | duplicatas existentes | ficam (event_ids diferentes); o invariante vale a partir da versão. Zero duráveis hoje |
@@ -97,16 +106,19 @@ garantia é do protocolo sim               sim (p/ SDK)        não
 precedente no código    ramo semântico    ARCHIMEDES subclasse  —
 depende do kit #6       para o produtor   para o produtor     —
 risco principal         artifact_id que   payload≠ c/ mesmo   lineage ambíguo
-                        não é identidade  id → 409 (certo)    por desenho
+                        não é identidade  id → replay MUDO    por desenho
+                                          (409 não existe;
+                                          exige CORE junto)
 ```
 
 A e B não são excludentes: B fixa a identidade na origem; A a reconheceria também para quem ainda não fala SDK. Se as duas forem adotadas, a chave de A e a derivação de B têm de ser **a mesma função** sobre os mesmos campos — senão o ecossistema terá duas definições de "mesmo fato".
 
 ## O que fica em aberto para quem decide
 
-1. Qual é a identidade do fato: `(producer, contract_id, contract_version, artifact_id)`? Ou o contrato declara o campo de identidade (`identity_field: planning_request_id`)? A segunda é mais honesta e mais cara (muda o schema do registry).
-2. Contratos sem `artifact_id` obrigatório: não deduplicam (explícito) ou passam a exigir?
+1. Qual é a identidade do fato: `(producer, contract_id, contract_version, artifact_id)`? Ou o contrato declara o campo de identidade (`identity_field: planning_request_id`)? A segunda é mais honesta e mais cara (muda o schema do registry — 10 contratos, MINOR cada). A primeira já está escrita: a Constituição nomeia `contract_id + contract_version + artifact_id` como o invariante do envelope canônico (`liceu_constitution.yaml:531`), e o `boundary_check` o exige de todo produtor (`liceu_boundary_check.py:263`, `CAMPOS_ENVELOPE_OBRIGATORIOS`). Escolher a primeira é dar efeito ao que já é regra; a segunda cria uma segunda regra.
+2. ~~Contratos sem `artifact_id`~~ — **a pergunta se desfaz**: `artifact_id` é campo do **envelope**, obrigatório em todos os contratos (`build_envelope(contract_id, payload, artifact_id, …)`, posicional; nenhum dos 10 `payload_schema` o declara porque não é do payload). O que varia é **o que cada produtor põe nele**: HUB usa `planning_request_id` (`planning_request_publisher.py:312`); ARCHIMEDES usa `archimedes_root_states:<state_id>:<state_version>` (`planning_state_publisher.py:306`) — a versão faz parte da identidade, logo SUPERSEDED é fato novo, como deve. A pergunta real é: o kit fiscaliza que `artifact_id` seja identidade estável do ato (e não referência ou aleatório)? Hoje não — e é onde A "muda o significado sem aviso" para os 6 httpx.
 3. Rótulo de versão para B: 0.5.0 (aditiva) ou 1.0.0 (default mudou).
 4. O kit #6 entra na mesma versão? Sem ele, B resolve o store e não resolve o produtor.
+5. **O 409 no CORE** entra antes, junto ou depois? Antes ou junto: senão há uma janela em que a colisão é silenciosa. É um PR no CORE (guarda + teste "mesmo `event_id`, `payload_hash` diferente → 409"), independente da saída escolhida — vale até para C.
 
 Sem implementação até a decisão. O ARCHIMEDES continua com a subclasse; o HUB continua exposto — e o elo 2 (CEFEIDA) não deve publicar sem que isto esteja decidido, ou nasce com o mesmo defeito.
