@@ -34,7 +34,7 @@ import json
 import os
 import sys
 
-KIT_VERSION = "0.12.1"
+KIT_VERSION = "0.13.0"
 
 # Modo estrito: em certificacao, a ausencia de jsonschema deve FALHAR, nao
 # degradar para o motor interno. Degradacao silenciosa de validador e a mesma
@@ -581,23 +581,23 @@ CASOS = [
  ("OPERA produz recomendacao do JOHN (violacao real: apps/opera/api/construction.py)",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.opera", contract_id="liceu.john.recommendation",
-    contract_version="1.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.0.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "custo", "weight": 0.5}],
-             "evidence_refs": ["ev1"]})),
+             "evidence_refs": ["ev1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}})),
 
  ("JOHN emite governance_decision_id (autoautorizacao)",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="1.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.0.0", causation_id="c1", decision_id="d1",
     governance_decision_id="g1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "custo", "weight": 0.5}],
-             "evidence_refs": ["ev1"]})),
+             "evidence_refs": ["ev1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}})),
 
  ("CEFEIDA emite decision_id (violacao real: john_decision_engine.py)",
   False, _base(event_type="cefeida.evidence.published",
@@ -635,11 +635,11 @@ CASOS = [
  ("JOHN recomenda com 1 alternativa (recomendar sem alternativa)",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="1.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.0.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["ev1"]})),
+             "evidence_refs": ["ev1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}})),
 
  ("CEFEIDA sem source_refs (evidencia sem fonte)",
   False, _base(event_type="cefeida.evidence.published",
@@ -651,13 +651,14 @@ CASOS = [
  ("JOHN produz recomendacao valida",
   True, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="1.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.0.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "corredor A"},
                               {"alternative_id": "B", "summary": "corredor B"}],
              "recommended_alternative_id": "A", "confidence": 0.82,
              "rationale": [{"factor": "perdas", "weight": 0.6,
                             "direction": "POSITIVE"}],
-             "evidence_refs": ["ev-cefeida-1"], "mode": "BALANCED"})),
+             "evidence_refs": ["ev-cefeida-1"], "mode": "BALANCED",
+             "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}})),
 
  ("ANCHOR autoriza validamente",
   True, _base(event_type="anchor.authorization.granted",
@@ -704,12 +705,12 @@ CASOS = [
  ("JOHN recomenda alternativa fora de alternatives",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="1.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.0.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "Z", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["ev1"]})),
+             "evidence_refs": ["ev1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}})),
 
  ("ANCHOR DENIED sem denial_reason",
   False, _base(event_type="anchor.authorization.granted",
@@ -739,7 +740,7 @@ CASOS = [
              "territorial_scope": "CONTINENTAL", "crs": "EPSG:4326",
              "candidates": [{"candidate_id": "corredor-A", "where": {"lat": -15},
                              "why": "menor perda estimada", "rank": 1,
-                             "evidence_refs": ["ev1"]}]})),
+                             "evidence_refs": ["ev1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}}]})),
 
  ("CEFEIDA evidence valida",
   True, _base(event_type="cefeida.evidence.published",
@@ -929,12 +930,12 @@ CASOS = [
  ("READ: violacao de autoridade em evento armazenado continua sendo achado",
   False, _lido(event_type="john.recommendation.generated",
     producer="liceu.opera", contract_id="liceu.john.recommendation",
-    contract_version="1.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.0.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["e1"]})),
+             "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}})),
 
  ("READ: schema invalido em evento armazenado continua sendo achado",
   False, _lido(event_type="cea.financial.exposure.assessed",
@@ -984,13 +985,13 @@ CASOS = [
  ("PUBLISH: envelope_fingerprint malformado -> rejeitado",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="1.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.0.0", causation_id="c1", decision_id="d1",
     envelope_fingerprint="curto",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["e1"]})),
+             "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}})),
  # --- decisao humana: o bloqueio WITNESS_WITH_EMPTY_AUTH (kit 0.8.0) ---
  ("HUMANO: testemunha com autenticacao vazia -> REJEITADO",
   False, _base(event_type="authority.human.decision.recorded",
