@@ -42,7 +42,7 @@ Isto muda o peso das saídas: hoje o defeito é "dois fatos para um ato" (duplic
 |---|---|---|
 | HUB (elo 0, pelo SDK) | default do SDK: `uuid4` | o 1/5 real produziu dois fatos para `pr-6b8fe798-…` (`5ef423a3…` e `1ee7869e…`) |
 | ARCHIMEDES (elo 1, pelo SDK) | **subclassa** o cliente (`DeterministicFederationClient`) e injeta `uuid5(producer\|contract\|state_id\|state_version\|content_hash)`; recomputa o fingerprint | já é a saída B — por fora do kit, porque o SDK não oferece o gancho |
-| FORNECEDORES (pelo SDK) | default do SDK | mesma exposição do HUB |
+| FORNECEDORES | **não publica pelo SDK** — `canonical_federation_client.py` é httpx de leitura; o kit é consumido só na CI (piloto do conformance) | nenhuma exposição hoje. *(Corrigido 2026-09-21: a primeira versão dizia "pelo SDK, mesma exposição do HUB" — lido no bump para 0.12.0.)* |
 | 6 com cliente httpx próprio (ANCHOR, CEA, ECONOTECH, …) | próprio, aleatório (ex.: CEA `EVT-{uuid4}`) | nenhuma saída no SDK os alcança até migrarem |
 
 **Precedentes de identidade determinística já no ecossistema:** `planning_request_id = uuid5(holder_id, requested_at, requested_scope)` no HUB; `promotion_request_id = uuid5("elo1|…")` e o `event_id` acima no ARCHIMEDES. A ideia "mesmo ato → mesmo id" não é nova; falta ela viver no protocolo.
@@ -78,7 +78,7 @@ Ponto de desenho que a leitura "derivar do conteúdo" esconde: derivar de `paylo
 | o que quebra | ARCHIMEDES: a subclasse `DeterministicFederationClient` vira redundante (remover; comportamento igual). HUB e FORNECEDORES: nada quebra — passam a receber replay onde hoje recebem duplicata. Testes que afirmam "dois publishes = dois `event_id`" (nenhum conhecido) |
 | MAJOR? | assinatura: aditiva (parâmetro opcional) → MINOR. Semântica: o default muda de "cada publish é um fato" para "cada identidade é um fato" — é exatamente a correção, mas é mudança de comportamento observável. Proposta honesta: **federation_sdk 0.4.0 → 0.5.0 com changelog explícito**, e a Constituição ganhando a frase da identidade. Se o critério for "comportamento default mudou", é MAJOR (1.0.0). A decisão de rótulo é do dono do kit |
 | duplicatas existentes | ficam (event_ids diferentes); o invariante vale a partir da versão. Zero duráveis hoje |
-| cobertura | **só os produtores no SDK** (3 hoje, 5 ao fim do ciclo 5). Os 6 httpx continuam aleatórios até migrar — o que já é o plano |
+| cobertura | **só os produtores no SDK** (2 hoje — HUB e ARCHIMEDES; 5 ao fim do ciclo 5). Os 6 httpx continuam aleatórios até migrar — o que já é o plano |
 | o que exige junto | kit **#6** (`PublishResult.idempotent`/`conformance`) — sem ele, o produtor recebe 200 nos dois casos e o HUB/ARCHIMEDES continuam rotulando fato novo como `REPLAYED` (ARCHIMEDES #26, HUB #9) |
 
 ### C — invariante no consumidor
