@@ -743,7 +743,7 @@ def _self_test() -> int:
                                {"alternative_id": "B", "summary": "y"}],
               "recommended_alternative_id": "A", "confidence": 0.8,
               "rationale": [{"factor": "c", "weight": 1}],
-              "evidence_refs": ["e1"]},
+              "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
              "art-1", lineage={"causation_id": "c1", "decision_id": "d1"}))
 
     # -- lineage proibido ---------------------------------------------------
@@ -753,7 +753,7 @@ def _self_test() -> int:
                                {"alternative_id": "B", "summary": "y"}],
               "recommended_alternative_id": "A", "confidence": 0.8,
               "rationale": [{"factor": "c", "weight": 1}],
-              "evidence_refs": ["e1"]},
+              "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
              "art-2", lineage={"causation_id": "c1", "decision_id": "d1",
                                "governance_decision_id": "g1"}))
 
@@ -764,7 +764,7 @@ def _self_test() -> int:
                                {"alternative_id": "B", "summary": "y"}],
               "recommended_alternative_id": "Z", "confidence": 0.8,
               "rationale": [{"factor": "c", "weight": 1}],
-              "evidence_refs": ["e1"]},
+              "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
              "art-3", lineage={"causation_id": "c1", "decision_id": "d1"}))
 
     # -- caminho feliz -------------------------------------------------------
@@ -776,7 +776,7 @@ def _self_test() -> int:
                               {"alternative_id": "B", "summary": "corredor B"}],
              "recommended_alternative_id": "A", "confidence": 0.82,
              "rationale": [{"factor": "perdas", "weight": 0.6}],
-             "evidence_refs": ["ev-cefeida-1"]},
+             "evidence_refs": ["ev-cefeida-1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
             "art-ok", lineage={"causation_id": "c-cefeida-1", "decision_id": "d1"})
         resultado["r"] = r
 
@@ -820,7 +820,7 @@ def _self_test() -> int:
                                {"alternative_id": "B", "summary": "y"}],
               "recommended_alternative_id": "A", "confidence": 0.8,
               "rationale": [{"factor": "c", "weight": 1}],
-              "evidence_refs": ["e1"]},
+              "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
              "art-4", lineage={"causation_id": "c1", "decision_id": "d1"}))
 
     # -- registry local nao e autoridade -------------------------------------
@@ -833,7 +833,7 @@ def _self_test() -> int:
                                {"alternative_id": "B", "summary": "y"}],
               "recommended_alternative_id": "A", "confidence": 0.8,
               "rationale": [{"factor": "c", "weight": 1}],
-              "evidence_refs": ["e1"]},
+              "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
              "art-5", lineage={"causation_id": "c1", "decision_id": "d1"}))
 
 
@@ -883,7 +883,7 @@ def _self_test() -> int:
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["e1"]},
+             "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
             "art-read", lineage={"causation_id": "c1", "decision_id": "d1"})
         v = cli_r.verify_persistence(res)
         if not v.persisted:
@@ -939,7 +939,7 @@ def _self_test() -> int:
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["e1"]},
+             "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
             artifact, lineage={"causation_id": "c1", "decision_id": "d1"})
 
     r1 = _pub(None, "art-t1")
@@ -992,7 +992,7 @@ def _self_test() -> int:
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["e1"]},
+             "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
             "art-col", lineage={"causation_id": "c1", "decision_id": "d1"})
 
     colidir["ativo"] = True
@@ -1039,7 +1039,7 @@ def _self_test() -> int:
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["e1"]},
+             "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
             artifact, lineage={"causation_id": "c1", "decision_id": "d1"}, **kw)
 
     ra = _rec("art-id-1")
@@ -1060,7 +1060,7 @@ def _self_test() -> int:
                           {"alternative_id": "B", "summary": "y"}],
          "recommended_alternative_id": "A", "confidence": 0.8,
          "rationale": [{"factor": "c", "weight": 1}],
-         "evidence_refs": ["e1"]},
+         "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
         "art-id-1", lineage={"causation_id": "c1", "decision_id": "d1"})
     ok_conteudo = rd_env["event_id"] == ra.event_id and rd_env["payload_hash"] != ra.envelope["payload_hash"]
     resultados.append(("identidade nao depende do conteudo", ok_conteudo))
@@ -1109,7 +1109,7 @@ def _self_test() -> int:
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
-             "evidence_refs": ["e1"]},
+             "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
             artifact, lineage={"causation_id": "c1", "decision_id": "d1"})
 
     g1 = _g("art-g")
@@ -1139,7 +1139,7 @@ def _self_test() -> int:
                           {"alternative_id": "B", "summary": "y"}],
          "recommended_alternative_id": "A", "confidence": 0.8,
          "rationale": [{"factor": "c", "weight": 1}],
-         "evidence_refs": ["e1"]},
+         "evidence_refs": ["e1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}},
         "art-old", lineage={"causation_id": "c1", "decision_id": "d1"})
     ok_unknown = r_old.idempotent is None and r_old.outcome == "UNKNOWN"
     resultados.append(("servidor sem corpo -> outcome UNKNOWN, nao PUBLISHED", ok_unknown))

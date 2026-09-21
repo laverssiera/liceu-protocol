@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.5.1
+  registry_version: 2.6.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -25,6 +25,9 @@ meta:
     por decisao: exigir forcaria preenchimento, e preenchimento sob pressao produz referencia inventada.
     Ausencia honesta e melhor que referencia falsa.'
   indexacao: contract_id -> contract_version -> definicao
+  changelog_2_6_0: 'MINOR do registry (2026-09-21, ciclo 6): liceu.john.recommendation 2.0.0 (MAJOR do
+    contrato: method_version e dissent obrigatorios); 1.0.0 RETIRED sem migracao (nenhum fato existe).
+    Consumidores: ANCHOR (subject do elo 4) e JOHN (produtor) fazem bump.'
   changelog_2_5_1: 'PATCH (2026-09-21, ciclo 6): liceu.anchor.authorization 1.1.0 ganha o invariante EPOCA —
     a autorizacao carrega a epoca em que foi autorizada (carimbo do CORE), nao a da causa; copiar a
     epoca da causa e 409. Texto apenas: nomeia o fencing do F1 que ja existe e e testado. Nenhum
@@ -252,6 +255,143 @@ contracts:
             description: artifact_id do objeto observado
       status: ACTIVE
   liceu.john.recommendation:
+    2.0.0:
+      contract_version: 2.0.0
+      event_type: john.recommendation.generated
+      classification: AUTHORITATIVE_EVENT
+      posicao_na_cadeia: 3
+      owner: liceu.john
+      allowed_producers:
+      - liceu.john
+      required_envelope_fields:
+      - artifact_id
+      - trace_id
+      - causation_id
+      - decision_id
+      forbidden_envelope_fields:
+        governance_decision_id: 'RECOMMENDATION != AUTHORIZATION. Se o produtor da recomendacao pudesse
+          emitir governance_decision_id, ele provaria a propria autorizacao. Esse campo pertence exclusivamente
+          ao liceu.anchor.
+
+          '
+        execution_id: JOHN nao executa
+      authority_invariants:
+      - recomendacao NUNCA e autorizacao
+      - toda recomendacao preserva lineage ate a evidencia que a sustenta
+      - confidence e rationale sao obrigatorios — sem caixa-preta
+      - 'confidence e resultado de METODO com versao declarada (method_version), nunca um literal;
+        sem metodo nao ha confidence, e sem confidence nao ha recomendacao (regra do P1, CORE #48)'
+      - 'a recomendacao carrega o QUADRO DE DISSENSO (dissent): quais dominios contribuiram e se ha
+        divergencia. Se um so dominio contribuiu, o campo diz isso (unanimous: true, contributing_domains
+        com um item) — nunca vazio fingindo consenso. Sem dissenso nao e recomendacao federativa'
+      - 'VIOLACAO CONHECIDA: discovery encontrou este evento produzido por liceu.opera em apps/opera/api/construction.py.
+        O executor produzindo a recomendacao que legitima a propria execucao fabrica historia legitima.
+        allowed_producers rejeita isso no publish.
+
+        '
+      domain_invariants:
+      - alternatives com pelo menos 2 itens — recomendar sem alternativa nao e decidir
+      - recommended_alternative_id deve existir em alternatives
+      - evidence_refs nao vazio
+      - contributing_domains com pelo menos 1 item; dissenting so com dominios que estejam em contributing_domains
+      payload_schema:
+        type: object
+        required:
+        - alternatives
+        - recommended_alternative_id
+        - confidence
+        - rationale
+        - evidence_refs
+        - method_version
+        - dissent
+        additionalProperties: false
+        properties:
+          alternatives:
+            type: array
+            minItems: 2
+            items:
+              type: object
+              required:
+              - alternative_id
+              - summary
+              properties:
+                alternative_id:
+                  type: string
+                summary:
+                  type: string
+                risk:
+                  type: object
+          recommended_alternative_id:
+            type: string
+          confidence:
+            type: number
+            minimum: 0
+            maximum: 1
+          rationale:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required:
+              - factor
+              - weight
+              properties:
+                factor:
+                  type: string
+                weight:
+                  type: number
+                direction:
+                  type: string
+                  enum:
+                  - POSITIVE
+                  - NEGATIVE
+                  - NEUTRAL
+          evidence_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          mode:
+            type: string
+            enum:
+            - CONSERVATIVE
+            - BALANCED
+            - AGGRESSIVE
+          method_version:
+            type: string
+            minLength: 1
+            description: '<metodo>/<versao> que produziu confidence e a escolha; reproducibilidade'
+          dissent:
+            type: object
+            required:
+            - contributing_domains
+            - unanimous
+            additionalProperties: false
+            properties:
+              contributing_domains:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+              unanimous:
+                type: boolean
+              dissenting:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - domain
+                  - position
+                  properties:
+                    domain:
+                      type: string
+                    position:
+                      type: string
+      changelog_2_0_0: 'MAJOR (2026-09-21, ciclo 6): method_version e dissent OBRIGATORIOS. Opcionais deixariam
+        passar recomendacao sem metodo e sem dissenso — o que o elo 3 existe para impedir. MAJOR de graca:
+        nenhum fato do contrato existe; 1.0.0 -> RETIRED.'
+      status: ACTIVE
+
     1.0.0:
       contract_version: 1.0.0
       event_type: john.recommendation.generated
@@ -346,7 +486,10 @@ contracts:
             - CONSERVATIVE
             - BALANCED
             - AGGRESSIVE
-      status: ACTIVE
+      status: RETIRED
+      retired_reason: 'MAJOR 2.0.0 (2026-09-21, ciclo 6): method_version e dissent passam a ser obrigatorios.
+        Aposentada sem migracao porque nenhum fato de liceu.john.recommendation existe em store algum;
+        RETIRED bloqueia escrita, nao leitura — e nao ha leitura.'
   liceu.anchor.authorization:
     1.1.0:
       contract_version: 1.1.0

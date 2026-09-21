@@ -50,7 +50,7 @@ events:
     - liceu.john
     classification: AUTHORITATIVE_EVENT
     contract_id: liceu.john.recommendation
-    contract_version: 1.0.0
+    contract_version: 2.0.0
     payload_schema: liceu_contract_registry.yaml#/contracts/liceu.john.recommendation/payload_schema
     transport:
       canonical_publish: http
