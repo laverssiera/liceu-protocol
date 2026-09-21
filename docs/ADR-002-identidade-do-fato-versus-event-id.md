@@ -1,6 +1,6 @@
 # ADR-002 — Identidade do fato versus `event_id`
 
-**Estado:** proposta em 2026-09-20; **corrigida em 2026-09-21** (o 409 que a primeira versão dava como existente não existe — ver §Contexto). Sem decisão. As três saídas estão levantadas com custo; a escolha é de protocolo.
+**Estado:** **DECIDIDO em 2026-09-21** (ver §Decisão). Proposta em 2026-09-20; corrigida em 2026-09-21 (o 409 que a primeira versão dava como existente não existia — ver §Contexto). As três saídas estão levantadas com custo; a escolha é de protocolo.
 **Origem:** CORE #47, aberto pelo primeiro fato real (1/5, `docs/evidence/2026-09-20-primeiro-fato-1of5.md` no CORE).
 
 ```
@@ -121,4 +121,24 @@ A e B não são excludentes: B fixa a identidade na origem; A a reconheceria tam
 4. O kit #6 entra na mesma versão? Sem ele, B resolve o store e não resolve o produtor.
 5. **O 409 no CORE** entra antes, junto ou depois? Antes ou junto: senão há uma janela em que a colisão é silenciosa. É um PR no CORE (guarda + teste "mesmo `event_id`, `payload_hash` diferente → 409"), independente da saída escolhida — vale até para C.
 
-Sem implementação até a decisão. O ARCHIMEDES continua com a subclasse; o HUB continua exposto — e o elo 2 (CEFEIDA) não deve publicar sem que isto esteja decidido, ou nasce com o mesmo defeito.
+## Decisão (2026-09-21, dono do kit)
+
+**1. Saída B, com a guarda no CORE.** O kit deriva `event_id` da identidade do fato. O CORE **não** deriva — aplica:
+
+```
+kit    event_id = uuid5(FACT_IDENTITY_NAMESPACE, producer_id|contract_id|contract_version|artifact_id)
+CORE   chave igual + payload_hash igual      → replay, 200, idempotent: true
+       chave igual + payload_hash diferente  → 409, com motivo nomeado
+```
+
+Por que B+guarda e não A+B: com A+B haveria duas funções calculando identidade — uma no kit, uma no CORE — e mesmo escritas iguais divergiriam no primeiro ajuste. Com B+guarda existe **uma** definição (no kit); o CORE só verifica consistência de conteúdo sob a chave que recebe. É a leitura estrita de "a mesma função sobre os mesmos campos": a forma de garantir isso é haver uma. Os 6 produtores httpx seguem com `event_id` aleatório até migrar ao SDK — não piora nada: estão em ALERT e o inventário do C1 já os lista.
+
+Teste obrigatório: o mesmo ato duas vezes → 200 + `idempotent: true` no segundo, mesmo `event_id`; ato diferente com a mesma identidade → 409, e nada gravado.
+
+**2. Identidade = a tupla do envelope, que já é constitucional** (`liceu_constitution.yaml:531`). O campo declarado por contrato exigiria schema novo no registry, MINOR em 10 contratos, o SDK lendo do payload e a revogação da tupla no mesmo ato — flexibilidade que nenhum contrato atual demonstrou precisar. Se um contrato futuro provar que a tupla não serve, a mudança é emenda constitucional que revoga a tupla no mesmo ato. Nunca duas regras convivendo.
+
+**3. Rótulo: próxima MINOR (federation_sdk 0.5.0, pacote 0.12.0). Não 1.0.0.** A 1.0.0 declara estabilidade; hoje a regra de identidade acabou de ser decidida, 6 produtores não usam o SDK e a cadeia está em 1/5. Fica para quando os 5 elos publicarem pelo SDK com a regra provada em produção. **O kit #6 entra na mesma tag**: B sem ele é invisível — o produtor recebe 200 nas duas publicações e não distingue fato novo de replay.
+
+**Ordem de execução:** (1) kit 0.12.0 — `event_id` por identidade + #6; (2) CORE — guarda 409 com teste; (3) bumps ARCHIMEDES, HUB, FORNECEDORES, CORE; (4) elo 2 depois de 1–3 em `main`. **A tag do kit não é consumida antes de (2) estar em `main`**: sem a guarda, o primeiro bump passa a descartar ato novo em silêncio.
+
+O ARCHIMEDES remove a subclasse `DeterministicFederationClient` no bump; o HUB e o ARCHIMEDES passam a rotular `PUBLISHED`/`REPLAYED` pelo corpo (`PublishResult.outcome`), fechando ARCHIMEDES #26 e HUB #9.
