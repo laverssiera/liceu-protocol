@@ -43,7 +43,7 @@ jobs:
       - name: Conformance self-test (liceu_conformance.py)      # esperado: 59/59
         run: python liceu_conformance.py --self-test
 
-      - name: Federation SDK self-test (liceu_federation_sdk.py) # esperado: 25/25
+      - name: Federation SDK self-test (liceu_federation_sdk.py) # esperado: 32/32
         run: python liceu_federation_sdk.py --self-test
 
   package:
