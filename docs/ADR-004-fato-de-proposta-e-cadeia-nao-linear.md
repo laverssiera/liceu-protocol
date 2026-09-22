@@ -1,6 +1,6 @@
 # ADR-004 — O fato de proposta e a cadeia não linear
 
-**Estado:** proposta em 2026-09-21. Sem decisão, só texto. A decisão é do dono do kit.
+**Estado:** DECIDIDA em 2026-09-21 pelo dono do kit (§8). Implementação: kit 0.14.0 → boundary do CORE → ARCHIMEDES → bumps → um Codespace.
 **Origem:** tentativa de disparar o elo 1 num CORE real (ciclo 6). Parou antes de subir ambiente: o kernel do ARCHIMEDES exige evidência para promover, e a evidência do CEFEIDA exige um fato publicado do ARCHIMEDES para existir. Circular na primeira volta.
 
 ```
@@ -152,3 +152,35 @@ Leitura sugerida: **A + C** — nada expira, e a ausência é um registro nomead
 7. `study_method_version: DECLARED` como marca explícita de proposta sem estudo — conta na estrutural, nunca na substantiva.
 
 Nada implementado. O Codespace não sobe antes disto: sem a proposta, o elo 1 não promove, e refazer o elo 0 prova o que o #50 já provou.
+
+## 8. Decisão (2026-09-21, dono do kit)
+
+Item a item do §7, com os ajustes que o dono fez ao texto:
+
+| § | Decisão |
+|---|---|
+| 7.1 | **Contrato novo** `liceu.archimedes.planning-proposal` 1.0.0. `DOMAIN_EVENT`. Mesmo `artifact_id` do planning-state (`archimedes_root_states:<state_id>:<state_version>`); `event_id` difere pelo `contract_id` (ADR-002). `causation_id` = o `hub.planning.requested`. Sem `posicao_na_cadeia`. |
+| 7.2 | `DOMAIN_EVENT` — sim. Proposta não é ato de autoridade. |
+| 7.3 | **Os dois resolvem.** O contrato declara `resolvable_refs: [{path, must_resolve_to: [{event_type, producer}, ...]}]`; o **boundary** do CORE resolve toda referência do payload assim declarada, como já resolve `causation_id` (422 `lineage_reference_not_found:<path>:<id>`), exigindo **tipo E produtor** do fato encontrado. O **ARCHIMEDES** resolve de novo, pelo SDK, antes de promover — e exige mais: o `causation_id` de cada evidência tem de ser o `event_id` da **versão** da proposta que está sendo promovida. |
+| 7.4 | `causation_id` **obrigatório** no planning-state (= proposta) e no cefeida.evidence (= versão da proposta evidenciada). MAJOR nos dois: planning-state **2.0.0**, cefeida.evidence **2.0.0**; 1.0.0 de ambos RETIRED sem migração (nenhum fato existe). `hub.planning-request` intocado: raiz, `causation_id` continua proibido. |
+| 7.5 | Proposta é **etapa interna do elo 1**, sem posição. R11 continua 5 elos. |
+| 7.6 | **A + C.** Nada expira. Ausência de evidência é declarada nomeando `liceu.cefeida` como owner do bloqueio. |
+| 7.7 | Sim à marca, mas **em dois campos** (C6-SM-01: um termo, uma dimensão). `study_basis: DECLARED\|METHOD` (enum, obrigatório) e `study_method_version` (obrigatório se METHOD, **proibido** se DECLARED — schema `if/then` + G5). A contagem substantiva exige `study_basis = METHOD`. O publisher recusa METHOD sem versão e DECLARED com versão. |
+
+**Ajuste do dono — a evidência amarra a VERSÃO.** `cefeida.evidence` 2.0.0: `subject_ref` = `artifact_id` da proposta (obrigatório); `causation_id` = `event_id` **da versão** da proposta evidenciada (obrigatório). Aprova-se uma versão, não um nome: evidência sobre a v1 não promove a v2.
+
+**`resolvable_refs` entra também onde já havia referência de payload:** `john.recommendation` 2.0.0 (`evidence_refs` → `cefeida.evidence.published` / `liceu.cefeida`) e `anchor.authorization` 1.1.0 (`legal_basis_refs` → `legal.admissibility.assessed` / `liceu.legal`; **opcional**: resolve só quando presente; ausente = UNCOVERED declarado; presente e irresolvível = 422 — e hoje toda referência falha, porque `liceu.legal` não publica, o que está certo).
+
+**Contagem declara o grafo.** Toda métrica diz o DAG que conta: "estrutural N/5, substantiva M/5 — DAG do ADR-004, retorno CEFEIDA → ARCHIMEDES; etapas internas não contam como elo".
+
+### 8.1 Extensão futura registrada, não implementada — R-VALIDITY
+
+Resolver prova que o fato **existe** com o tipo e o produtor exigidos. Não prova que está **válido**: uma `cefeida.evidence.published` SUPERSEDED (ou retratada, quando isso existir) resolve e passa no boundary e no ARCHIMEDES. Validade é dimensão própria (C6-SM-01 `knowledge_validity`). Quando houver fato de supersessão/retratação, `must_resolve_to` ganha uma condição de validade — não antes, para não inventar estado que nenhum contrato produz.
+
+### 8.2 Ordem de implementação (do dono)
+
+1. kit 0.14.0 — contratos, registries, self-tests, tag após merge.
+2. CORE — boundary resolve `resolvable_refs` (tipo e produtor), com teste.
+3. ARCHIMEDES — `publish_proposal`; promoção exige evidência cuja `causation_id` == `event_id` da versão promovida, com teste; a justificativa de VALIDATED diz o que validou (estrutura).
+4. bumps.
+5. UM Codespace: 0 → proposta → evidência → planning-state → recomendação; duas contagens, grafo declarado.
