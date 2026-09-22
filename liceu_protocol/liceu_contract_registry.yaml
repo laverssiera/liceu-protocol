@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.6.0
+  registry_version: 2.7.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -25,6 +25,13 @@ meta:
     por decisao: exigir forcaria preenchimento, e preenchimento sob pressao produz referencia inventada.
     Ausencia honesta e melhor que referencia falsa.'
   indexacao: contract_id -> contract_version -> definicao
+  changelog_2_7_0: 'MINOR do registry (ADR-004, 2026-09-21): liceu.archimedes.planning-proposal 1.0.0
+    (DOMAIN_EVENT, etapa interna do elo 1, sem posicao); planning-state 2.0.0 e cefeida.evidence 2.0.0
+    (causation_id obrigatorio; evidence_refs/subject_ref obrigatorios; 1.0.0 RETIRED sem migracao);
+    resolvable_refs (chave nova): o boundary resolve referencias do PAYLOAD como ja resolve causation_id,
+    exigindo event_type E producer do fato encontrado. LIMITE (R-VALIDITY, extensao futura): resolver
+    prova que o fato EXISTE, nao que esta VALIDO — uma evidencia SUPERSEDED resolve e passa.
+    hub.planning-request intocado: raiz, causation_id continua proibido.'
   changelog_2_6_0: 'MINOR do registry (2026-09-21, ciclo 6): liceu.john.recommendation 2.0.0 (MAJOR do
     contrato: method_version e dissent obrigatorios); 1.0.0 RETIRED sem migracao (nenhum fato existe).
     Consumidores: ANCHOR (subject do elo 4) e JOHN (produtor) fazem bump.'
@@ -58,8 +65,8 @@ meta:
     REGRA: aposentadoria bloqueia ESCRITA, nunca LEITURA. Se RETIRED bloqueasse leitura, eventos historicos
       deixariam de validar e a historia se tornaria irreconstruivel.
   contagem:
-    contract_ids: 10
-    versoes: 12
+    contract_ids: 11
+    versoes: 16
   nota_ramificacao: 'liceu.authority.human-decision NAO tem posicao_na_cadeia: e ramificacao de contingencia,
     nao elo sequencial'
 compatibility_policy:
@@ -89,7 +96,229 @@ envelope_baseline:
 
     '
 contracts:
+  liceu.archimedes.planning-proposal:
+    1.0.0:
+      contract_version: 1.0.0
+      event_type: archimedes.planning.proposal.published
+      classification: DOMAIN_EVENT
+      posicao_na_cadeia: null
+      natureza: ETAPA_INTERNA_DO_ELO_1
+      owner: liceu.archimedes
+      allowed_producers:
+      - liceu.archimedes
+      required_envelope_fields:
+      - artifact_id
+      - trace_id
+      - causation_id
+      forbidden_envelope_fields:
+        decision_id: ARCHIMEDES nao decide — decisao cognitiva e do liceu.john
+        governance_decision_id: ARCHIMEDES nao autoriza — autorizacao e do liceu.anchor
+        execution_id: ARCHIMEDES nao executa — execucao e do liceu.opera
+      authority_invariants:
+      - 'proposta NAO e alternativa autorizada nem estado autoritativo: e o estudo ANTES do ato de promocao
+        (Root State em ANALYSIS). DOMAIN_EVENT, nao AUTHORITATIVE_EVENT'
+      - 'causation_id e o event_id do hub.planning.requested que a causou; scale e a do pedido — a proposta
+        nao afirma escala propria (escala e afirmacao de autoridade)'
+      - 'artifact_id = archimedes_root_states:<state_id>:<state_version> — o MESMO do planning-state, para que
+        a evidencia (subject_ref) e o estado apontem para o mesmo objeto; event_id difere pelo contract_id
+        (ADR-002)'
+      - 'candidates[].evidence_refs VAZIO ou ausente na proposta: a evidencia vem depois e aponta para ela'
+      - 'study_basis separa a contagem SUBSTANTIVA (METHOD) da ESTRUTURAL (DECLARED ou METHOD); DECLARED marca
+        candidatos declarados pelo mandatario, sem metodo — nunca contado como estudo'
+      domain_invariants:
+      - study_basis = METHOD exige study_method_version; study_basis = DECLARED proibe study_method_version (schema)
+      - candidates nao vazio
+      - cada candidate tem why
+      - crs obrigatorio quando ha geometria
+      payload_schema:
+        type: object
+        required:
+        - planning_request_id
+        - state_id
+        - state_version
+        - content_hash
+        - territorial_scope
+        - candidates
+        - study_basis
+        - proposed_at
+        additionalProperties: false
+        properties:
+          planning_request_id:
+            type: string
+            minLength: 1
+          state_id:
+            type: string
+            minLength: 1
+          state_version:
+            type: integer
+            minimum: 1
+          content_hash:
+            type: string
+            minLength: 32
+            description: content_hash do Root State proposto — a evidencia e o estado referem esta versao
+          territorial_scope:
+            type: string
+            enum:
+            - SITE
+            - REGION
+            - TERRITORY
+            - CONTINENTAL
+            - PLANETARY
+          crs:
+            type: string
+            description: EPSG:xxxx
+          candidates:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required:
+              - candidate_id
+              - where
+              - why
+              properties:
+                candidate_id:
+                  type: string
+                where:
+                  type: object
+                why:
+                  type: string
+                  minLength: 1
+                rank:
+                  type: integer
+                  minimum: 1
+          study_basis:
+            type: string
+            enum:
+            - DECLARED
+            - METHOD
+          study_method_version:
+            type: string
+            minLength: 1
+            description: <metodo>/<versao> que produziu os candidatos; so com study_basis = METHOD
+          proposed_at:
+            type: string
+            format: date-time
+        allOf:
+        - if:
+            properties:
+              study_basis:
+                const: METHOD
+          then:
+            required:
+            - study_method_version
+        - if:
+            properties:
+              study_basis:
+                const: DECLARED
+          then:
+            not:
+              required:
+              - study_method_version
+      status: ACTIVE
   liceu.archimedes.planning-state:
+    2.0.0:
+      contract_version: 2.0.0
+      event_type: archimedes.planning.state.authoritative
+      classification: AUTHORITATIVE_EVENT
+      posicao_na_cadeia: 1
+      owner: liceu.archimedes
+      allowed_producers:
+      - liceu.archimedes
+      required_envelope_fields:
+      - artifact_id
+      - trace_id
+      - causation_id
+      resolvable_refs:
+      - path: candidates[].evidence_refs
+        must_resolve_to:
+        - event_type: cefeida.evidence.published
+          producer: liceu.cefeida
+      forbidden_envelope_fields:
+        decision_id: ARCHIMEDES nao decide — decisao cognitiva e do liceu.john
+        governance_decision_id: ARCHIMEDES nao autoriza — autorizacao e do liceu.anchor
+        execution_id: ARCHIMEDES nao executa — execucao e do liceu.opera
+      authority_invariants:
+      - 'causation_id e o event_id da PROPOSTA (archimedes.planning.proposal.published) que este estado
+        promove — nunca o pedido: o pedido causa a proposta, a proposta causa o estado (ADR-004)'
+      - 'cada candidate carrega evidence_refs (>=1) que RESOLVEM, no CORE, para cefeida.evidence.published
+        de liceu.cefeida cujo causation_id seja o event_id da MESMA versao da proposta — aprova-se uma
+        versao, nao um nome. O boundary resolve (resolvable_refs); o ARCHIMEDES resolve antes de promover'
+      - produz alternativa territorial, nunca escolha autorizada
+      - estado deve estar em AUTHORITATIVE ou AUTHORITATIVE_OUTPUT do Authority Kernel
+      - WHERE_TO_BUILD e WHY_TO_BUILD sao justificativas, nao aprovacoes
+      domain_invariants:
+      - candidates nao vazio quando state_status = AUTHORITATIVE_OUTPUT
+      - cada candidate tem why (justificativa rastreavel a evidencia)
+      - crs obrigatorio quando ha geometria
+      payload_schema:
+        type: object
+        required:
+        - planning_request_id
+        - state_status
+        - territorial_scope
+        - candidates
+        additionalProperties: false
+        properties:
+          planning_request_id:
+            type: string
+            minLength: 1
+          state_status:
+            type: string
+            enum:
+            - DRAFT
+            - OBSERVATION
+            - ANALYSIS
+            - RECOMMENDATION
+            - VALIDATED
+            - AUTHORITATIVE
+            - AUTHORITATIVE_OUTPUT
+            - SUPERSEDED
+            - REJECTED
+          territorial_scope:
+            type: string
+            enum:
+            - SITE
+            - REGION
+            - TERRITORY
+            - CONTINENTAL
+            - PLANETARY
+          crs:
+            type: string
+            description: EPSG:xxxx
+          candidates:
+            type: array
+            items:
+              type: object
+              required:
+              - candidate_id
+              - where
+              - why
+              - evidence_refs
+              properties:
+                candidate_id:
+                  type: string
+                where:
+                  type: object
+                why:
+                  type: string
+                  minLength: 1
+                rank:
+                  type: integer
+                  minimum: 1
+                evidence_refs:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                    description: event_id de cefeida.evidence.published (resolvido pelo boundary)
+          supersedes:
+            type:
+            - string
+            - 'null'
+      changelog_2_0_0: 'MAJOR (ADR-004, 2026-09-21): causation_id obrigatorio no envelope (= proposta);
+        candidates[].evidence_refs obrigatorio, >=1, resolvivel (resolvable_refs). 1.0.0 -> RETIRED.'
+      status: ACTIVE
     1.0.0:
       contract_version: 1.0.0
       event_type: archimedes.planning.state.authoritative
@@ -176,8 +405,94 @@ contracts:
             type:
             - string
             - 'null'
-      status: ACTIVE
+      status: RETIRED
+      retired_reason: 'MAJOR 2.0.0 (ADR-004, 2026-09-21): causation_id (a proposta) e candidates[].evidence_refs
+        (>=1, resolviveis) passam a ser obrigatorios. Sem migracao: nenhum fato deste contrato existe em CORE
+        real. RETIRED bloqueia escrita, nao leitura.'
   liceu.cefeida.evidence:
+    2.0.0:
+      contract_version: 2.0.0
+      event_type: cefeida.evidence.published
+      classification: AUTHORITATIVE_EVENT
+      posicao_na_cadeia: 2
+      owner: liceu.cefeida
+      allowed_producers:
+      - liceu.cefeida
+      required_envelope_fields:
+      - artifact_id
+      - trace_id
+      - observed_at
+      - causation_id
+      forbidden_envelope_fields:
+        decision_id: 'CEFEIDA calcula, JOHN interpreta. Correlacao ou forecast nunca vira decisao. Discovery
+          encontrou john_decision_engine.py dentro do CEFEIDA — este campo torna esse padrao rejeitavel
+          no publish.
+
+          '
+        governance_decision_id: CEFEIDA nao autoriza
+        execution_id: CEFEIDA nao executa
+      authority_invariants:
+      - 'a evidencia amarra a VERSAO do objeto: subject_ref = artifact_id da proposta observada; causation_id =
+        event_id DA VERSAO da proposta evidenciada. Evidencia sobre a versao 1 nao promove a versao 2 —
+        aprova-se uma versao, nao um nome (ADR-004)'
+      - 'evidencia e reproduzivel: mesma fonte + metodo + versao => mesmo valor'
+      - forecast sempre acompanhado de confidence e horizonte
+      - evidencia nunca carrega recomendacao
+      domain_invariants:
+      - source_refs nao vazio — evidencia sem fonte nao e evidencia
+      - method_version presente para reproducibilidade
+      - confidence obrigatorio quando kind = FORECAST
+      payload_schema:
+        type: object
+        required:
+        - evidence_kind
+        - metric
+        - value
+        - unit
+        - source_refs
+        - method_version
+        - subject_ref
+        additionalProperties: false
+        properties:
+          evidence_kind:
+            type: string
+            enum:
+            - OBSERVATION
+            - METRIC
+            - FORECAST
+            - ANOMALY
+            - TREND
+            - STATISTICAL_EVIDENCE
+          metric:
+            type: string
+            minLength: 1
+          value:
+            type:
+            - number
+            - string
+            - object
+          unit:
+            type: string
+          confidence:
+            type: number
+            minimum: 0
+            maximum: 1
+          horizon:
+            type: string
+            description: ISO 8601 duration; obrigatorio em FORECAST
+          source_refs:
+            type: array
+            minItems: 1
+            items:
+              type: string
+          method_version:
+            type: string
+          subject_ref:
+            type: string
+            description: artifact_id do objeto observado
+      changelog_2_0_0: 'MAJOR (ADR-004, 2026-09-21): causation_id obrigatorio no envelope (= versao da proposta);
+        subject_ref obrigatorio (= artifact_id da proposta). 1.0.0 -> RETIRED.'
+      status: ACTIVE
     1.0.0:
       contract_version: 1.0.0
       event_type: cefeida.evidence.published
@@ -253,7 +568,9 @@ contracts:
           subject_ref:
             type: string
             description: artifact_id do objeto observado
-      status: ACTIVE
+      status: RETIRED
+      retired_reason: 'MAJOR 2.0.0 (ADR-004, 2026-09-21): causation_id (a versao da proposta evidenciada) e
+        subject_ref (artifact_id da proposta) passam a ser obrigatorios. Sem migracao: nenhum fato existe.'
   liceu.john.recommendation:
     2.0.0:
       contract_version: 2.0.0
@@ -268,6 +585,11 @@ contracts:
       - trace_id
       - causation_id
       - decision_id
+      resolvable_refs:
+      - path: evidence_refs
+        must_resolve_to:
+        - event_type: cefeida.evidence.published
+          producer: liceu.cefeida
       forbidden_envelope_fields:
         governance_decision_id: 'RECOMMENDATION != AUTHORIZATION. Se o produtor da recomendacao pudesse
           emitir governance_decision_id, ele provaria a propria autorizacao. Esse campo pertence exclusivamente
@@ -505,6 +827,13 @@ contracts:
       - causation_id
       - decision_id
       - governance_decision_id
+      resolvable_refs:
+      - path: legal_basis_refs
+        must_resolve_to:
+        - event_type: legal.admissibility.assessed
+          producer: liceu.legal
+        note: 'opcional: resolve SO quando presente; ausente e aceito e significa UNCOVERED. Presente e
+          irresolvivel e 422 — hoje TODA referencia falha, porque liceu.legal nao publica; e esta certo.'
       forbidden_envelope_fields:
         execution_id: 'ANCHOR autoriza, OPERA executa. Se o autorizador emitisse execution_id, autoridade
           e execucao coabitariam — que e exatamente a violacao encontrada no ANCHOR (governanca junto
