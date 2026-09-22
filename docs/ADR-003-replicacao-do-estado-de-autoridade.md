@@ -158,7 +158,41 @@ Sem (1), qualquer opção replica uma declaração. Sem (2), qualquer opção gr
 
 Em B, o teste `test_stale_epoch_is_rejected_even_with_instance_online` continua verdadeiro **e ganha a partição** como caso: a antiga Ativa isolada tenta publicar com a época que tinha e é recusada — pela maioria, não por uma tabela que ela mesma poderia ter.
 
-## 6. Perguntas em aberto para quem decide
+## 6. Custo operacional para quem opera sozinho
+
+O §3 dá o custo de cada opção em termos de sistema. Falta a pergunta que decide na prática de quem mantém isto sem equipe: **o que acontece às 3h da manhã, sozinho.**
+
+```
+                          A · streaming          B · consenso            C · replay do store
+o que sobe a mais         1 réplica + árbitro    3 nós (etcd/Raft)       nada
+                          de failover
+quem decide o failover    você, ou um árbitro    o quórum, sozinho       você (o store não decide)
+                          que também precisa
+                          ser operado
+falha típica              lag silencioso: a      cluster perde quórum    projeção atrasada: um
+                          réplica esta atrás     e TODO publish para,    publish entra sob época
+                          e ninguem avisa        se enforce depender     antiga numa janela curta
+                                                 dele sem cache
+o que voce faz as 3h      decidir promover sem   restaurar um nó; nada   reprocessar o replay;
+                          saber o lag; e a       de decisao humana no    o store nao perdeu nada
+                          decisao mais cara      caminho critico
+                          do conjunto
+reversivel?               sim — e topologia,     dificil: o estado de    sim — a projecao se
+                          o dado nao muda        autoridade migrou       reconstroi dos fatos
+                          de forma               para fora do Postgres
+ensaio necessario         failover manual        matar 1 de 3 nos e      derrubar e reconstruir a
+                          cronometrado           medir o publish         projecao com o store vivo
+```
+
+Três leituras deste quadro, sem escolher por você:
+
+- **A é a mais barata de subir e a mais cara de usar**: a única em que a decisão difícil (promover ou não, com lag desconhecido) cai sobre uma pessoa, acordada, sob pressão. E é a única que **não** responde ao §4 — a Testemunha continua lendo a Ativa.
+- **B é a única que não exige presença humana no failover**, e é a que mais exige presença no resto: três nós, certificados, snapshots. Para um operador único, o risco muda de forma — deixa de ser "eu decido errado" e passa a ser "o quórum cai e o ecossistema inteiro para de publicar". Esse segundo risco é mitigável (cache com lease no `enforce`), e a mitigação tem de estar no plano, não no improviso.
+- **C não sobe nada novo e cobra em código**: contratos, projeção, replay, e cuidado com a circularidade no boot (o CORE precisa saber a época para aceitar fatos, e a época vem de fatos). Em compensação, é a única cujo modo de falha é *reversível lendo o que já existe* — e a única que casa com o resto do ecossistema, onde "o que é verdade" já é fato publicado.
+
+Nenhuma das três dispensa o item (1) do §4 — a sonda própria da Testemunha. Ela é trabalho seu em qualquer topologia, e sem ela a `CLM-0006` continua REFUTED mesmo com a replicação pronta. Seria falso dizer o contrário.
+
+## 7. Perguntas em aberto para quem decide
 
 1. **Quem é a Mãe: o CORE ou um processo à parte?** Três Mães = três CORE completos (cada um com kit, boundary, store) ou um control plane extraído do CORE (só a camada A) e um CORE por domínio consumindo-o? A segunda é menor e é a que B pede.
 2. **A Testemunha vota?** Em B, é nó de consenso. A Constituição diz "só informa". Ou se separa em contrato *votar no log* de *autorizar atos*, ou a Testemunha fica fora do quórum (2 nós de consenso + 1 observador — e 2 nós não têm maioria numa partição: volta-se a "duas Mães sem quórum", que a própria Constituição reconhece).
