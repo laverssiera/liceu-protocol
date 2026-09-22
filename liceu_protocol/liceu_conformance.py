@@ -34,7 +34,7 @@ import json
 import os
 import sys
 
-KIT_VERSION = "0.14.0"
+KIT_VERSION = "0.15.0"
 
 # Modo estrito: em certificacao, a ausencia de jsonschema deve FALHAR, nao
 # degradar para o motor interno. Degradacao silenciosa de validador e a mesma
@@ -608,7 +608,7 @@ CASOS = [
  ("OPERA produz recomendacao do JOHN (violacao real: apps/opera/api/construction.py)",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.opera", contract_id="liceu.john.recommendation",
-    contract_version="2.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.1.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
@@ -618,7 +618,7 @@ CASOS = [
  ("JOHN emite governance_decision_id (autoautorizacao)",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="2.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.1.0", causation_id="c1", decision_id="d1",
     governance_decision_id="g1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
@@ -665,7 +665,7 @@ CASOS = [
  ("JOHN recomenda com 1 alternativa (recomendar sem alternativa)",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="2.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.1.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
              "rationale": [{"factor": "c", "weight": 1}],
@@ -680,10 +680,33 @@ CASOS = [
              "unit": "u", "source_refs": [], "method_version": "1.0.0",
              "subject_ref": "archimedes_root_states:rs-1:1"})),
 
+ ("JOHN recomenda SEM confidence — metodo que nao calcula confianca nao a declara (2.1.0)",
+  True, _base(event_type="john.recommendation.generated",
+    producer_id="liceu.john", contract_id="liceu.john.recommendation",
+    contract_version="2.1.0", causation_id="c1", decision_id="d1",
+    artifact_id="art-john-relay-1",
+    payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
+                              {"alternative_id": "B", "summary": "y"}],
+             "recommended_alternative_id": "A",
+             "rationale": [{"factor": "rank do dominio contribuinte", "weight": 1}],
+             "evidence_refs": ["ev-cefeida-1"], "method_version": "john.single-domain-relay/0.1",
+             "dissent": {"contributing_domains": ["liceu.archimedes"], "unanimous": True}})),
+
+ ("JOHN 2.0.0 RETIRED (nao aceita publicacao)",
+  False, _base(event_type="john.recommendation.generated",
+    producer_id="liceu.john", contract_id="liceu.john.recommendation",
+    contract_version="2.0.0", causation_id="c1", decision_id="d1",
+    payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
+                              {"alternative_id": "B", "summary": "y"}],
+             "recommended_alternative_id": "A", "confidence": 0.8,
+             "rationale": [{"factor": "c", "weight": 1}],
+             "evidence_refs": ["ev1"], "method_version": "test-method/0.0",
+             "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}})),
+
  ("JOHN produz recomendacao valida",
   True, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="2.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.1.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "corredor A"},
                               {"alternative_id": "B", "summary": "corredor B"}],
              "recommended_alternative_id": "A", "confidence": 0.82,
@@ -740,7 +763,7 @@ CASOS = [
  ("JOHN recomenda alternativa fora de alternatives",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="2.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.1.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "Z", "confidence": 0.8,
@@ -1069,7 +1092,7 @@ CASOS = [
  ("READ: violacao de autoridade em evento armazenado continua sendo achado",
   False, _lido(event_type="john.recommendation.generated",
     producer="liceu.opera", contract_id="liceu.john.recommendation",
-    contract_version="2.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.1.0", causation_id="c1", decision_id="d1",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],
              "recommended_alternative_id": "A", "confidence": 0.8,
@@ -1124,7 +1147,7 @@ CASOS = [
  ("PUBLISH: envelope_fingerprint malformado -> rejeitado",
   False, _base(event_type="john.recommendation.generated",
     producer_id="liceu.john", contract_id="liceu.john.recommendation",
-    contract_version="2.0.0", causation_id="c1", decision_id="d1",
+    contract_version="2.1.0", causation_id="c1", decision_id="d1",
     envelope_fingerprint="curto",
     payload={"alternatives": [{"alternative_id": "A", "summary": "x"},
                               {"alternative_id": "B", "summary": "y"}],

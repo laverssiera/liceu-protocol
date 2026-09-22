@@ -5,7 +5,7 @@ Registries, conformance kit (G1–G5), Federation SDK, registry checker e bounda
 checker. Decisão: [ADR-001](docs/ADR-001-onde-o-kit-vive.md).
 
 ```
-constitution=1.15.0   conformance_kit=0.14.0   federation_sdk=0.5.0
+constitution=1.15.0   conformance_kit=0.15.0   federation_sdk=0.5.0
 registry_checker=1.4.0   boundary_checker=1.1.0   package_date=2026-09-18
 ```
 
@@ -14,7 +14,7 @@ registry_checker=1.4.0   boundary_checker=1.1.0   package_date=2026-09-18
 Fixe a versão. As três Mães validam sob a mesma lei só se as três fixarem a mesma.
 
 ```bash
-pip install "liceu-protocol @ git+https://github.com/laverssiera/liceu-protocol@v0.14.0"
+pip install "liceu-protocol @ git+https://github.com/laverssiera/liceu-protocol@v0.15.0"
 ```
 
 ## Usar
