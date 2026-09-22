@@ -34,7 +34,7 @@ import json
 import os
 import sys
 
-KIT_VERSION = "0.13.0"
+KIT_VERSION = "0.14.0"
 
 # Modo estrito: em certificacao, a ausencia de jsonschema deve FALHAR, nao
 # degradar para o motor interno. Degradacao silenciosa de validador e a mesma
@@ -260,7 +260,25 @@ def validar(envelope: dict, cr: dict, *, mode: str = "publish") -> None:
 
 def _g5(contract_id: str, p: dict, env: dict | None = None) -> None:
     """Invariantes de dominio que so existem na relacao entre campos."""
-    if contract_id == "liceu.archimedes.planning-state":
+    if contract_id == "liceu.archimedes.planning-proposal":
+        # ADR-004 §7.7: um termo, uma dimensao. METHOD exige versao; DECLARED
+        # proibe — um metodo declarado num candidato "declarado" e fabricacao.
+        basis, mv = p.get("study_basis"), p.get("study_method_version")
+        if basis == "METHOD" and not (mv or "").strip():
+            raise Rejeicao("G5-LOCAL", "study_basis=METHOD sem study_method_version")
+        if basis == "DECLARED" and mv is not None:
+            raise Rejeicao("G5-LOCAL",
+                "study_basis=DECLARED com study_method_version: declarado nao tem metodo")
+        for c in p.get("candidates", []):
+            if c.get("evidence_refs"):
+                raise Rejeicao("G5-LOCAL",
+                    f"candidate {c.get('candidate_id')} com evidence_refs na PROPOSTA: "
+                    f"a evidencia vem depois e aponta para a proposta, nao o contrario")
+            if not (c.get("why") or "").strip():
+                raise Rejeicao("G5-LOCAL",
+                    f"candidate {c.get('candidate_id')} sem why — WHERE sem WHY nao e proposta")
+
+    elif contract_id == "liceu.archimedes.planning-state":
         if p.get("state_status") == "AUTHORITATIVE_OUTPUT" and not p.get("candidates"):
             raise Rejeicao("G5-LOCAL",
                 "AUTHORITATIVE_OUTPUT sem candidates: saida autoritativa vazia")
@@ -577,6 +595,15 @@ def _base(**kw):
     return e
 
 
+# Proposta minima valida (ADR-004): DECLARED, sem metodo, sem evidence_refs.
+_PROPOSTA = {
+    "planning_request_id": "pr-1", "state_id": "rs-1", "state_version": 1,
+    "content_hash": "b" * 64, "territorial_scope": "SITE", "crs": "EPSG:4326",
+    "candidates": [{"candidate_id": "c1", "where": {"lat": -15, "lon": -47},
+                    "why": "declarado pelo mandatario", "rank": 1}],
+    "study_basis": "DECLARED", "proposed_at": "2026-09-21T12:00:00Z",
+}
+
 CASOS = [
  ("OPERA produz recomendacao do JOHN (violacao real: apps/opera/api/construction.py)",
   False, _base(event_type="john.recommendation.generated",
@@ -602,10 +629,11 @@ CASOS = [
  ("CEFEIDA emite decision_id (violacao real: john_decision_engine.py)",
   False, _base(event_type="cefeida.evidence.published",
     producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
-    contract_version="1.0.0", observed_at="2026-08-29T00:00:00Z",
-    decision_id="d1",
+    contract_version="2.0.0", observed_at="2026-08-29T00:00:00Z",
+    causation_id="evt-proposta-v1", decision_id="d1",
     payload={"evidence_kind": "METRIC", "metric": "deficit", "value": 12,
-             "unit": "GW", "source_refs": ["s1"], "method_version": "1.0.0"})),
+             "unit": "GW", "source_refs": ["s1"], "method_version": "1.0.0",
+             "subject_ref": "archimedes_root_states:rs-1:1"})),
 
  ("ANCHOR emite execution_id (autoridade + execucao juntas)",
   False, _base(event_type="anchor.authorization.granted",
@@ -629,8 +657,10 @@ CASOS = [
   False, _base(event_type="cefeida.evidence.published",
     producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
     contract_version="v1", observed_at="2026-08-29T00:00:00Z",
+    causation_id="evt-proposta-v1",
     payload={"evidence_kind": "METRIC", "metric": "m", "value": 1,
-             "unit": "u", "source_refs": ["s"], "method_version": "1.0.0"})),
+             "unit": "u", "source_refs": ["s"], "method_version": "1.0.0",
+             "subject_ref": "archimedes_root_states:rs-1:1"})),
 
  ("JOHN recomenda com 1 alternativa (recomendar sem alternativa)",
   False, _base(event_type="john.recommendation.generated",
@@ -644,9 +674,11 @@ CASOS = [
  ("CEFEIDA sem source_refs (evidencia sem fonte)",
   False, _base(event_type="cefeida.evidence.published",
     producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
-    contract_version="1.0.0", observed_at="2026-08-29T00:00:00Z",
+    contract_version="2.0.0", observed_at="2026-08-29T00:00:00Z",
+    causation_id="evt-proposta-v1",
     payload={"evidence_kind": "METRIC", "metric": "m", "value": 1,
-             "unit": "u", "source_refs": [], "method_version": "1.0.0"})),
+             "unit": "u", "source_refs": [], "method_version": "1.0.0",
+             "subject_ref": "archimedes_root_states:rs-1:1"})),
 
  ("JOHN produz recomendacao valida",
   True, _base(event_type="john.recommendation.generated",
@@ -674,33 +706,36 @@ CASOS = [
  ("ARCHIMEDES AUTHORITATIVE_OUTPUT sem candidates",
   False, _base(event_type="archimedes.planning.state.authoritative",
     producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-state",
-    contract_version="1.0.0",
+    contract_version="2.0.0", causation_id="evt-proposta-v1",
     payload={"planning_request_id": "pr1", "state_status": "AUTHORITATIVE_OUTPUT",
              "territorial_scope": "CONTINENTAL", "candidates": []})),
 
  ("ARCHIMEDES candidate sem why (WHERE sem WHY)",
   False, _base(event_type="archimedes.planning.state.authoritative",
     producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-state",
-    contract_version="1.0.0",
+    contract_version="2.0.0", causation_id="evt-proposta-v1",
     payload={"planning_request_id": "pr1", "state_status": "AUTHORITATIVE_OUTPUT",
              "territorial_scope": "CONTINENTAL",
-             "candidates": [{"candidate_id": "c1", "where": {}, "why": "  "}]})),
+             "candidates": [{"candidate_id": "c1", "where": {}, "why": "  ",
+                             "evidence_refs": ["ev1"]}]})),
 
  ("CEFEIDA FORECAST sem confidence",
   False, _base(event_type="cefeida.evidence.published",
     producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
-    contract_version="1.0.0", observed_at="2026-08-29T00:00:00Z",
+    contract_version="2.0.0", observed_at="2026-08-29T00:00:00Z",
+    causation_id="evt-proposta-v1",
     payload={"evidence_kind": "FORECAST", "metric": "demanda", "value": 10,
              "unit": "GW", "source_refs": ["s1"], "method_version": "1.0.0",
-             "horizon": "P30D"})),
+             "horizon": "P30D", "subject_ref": "archimedes_root_states:rs-1:1"})),
 
  ("CEFEIDA FORECAST sem horizon",
   False, _base(event_type="cefeida.evidence.published",
     producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
-    contract_version="1.0.0", observed_at="2026-08-29T00:00:00Z",
+    contract_version="2.0.0", observed_at="2026-08-29T00:00:00Z",
+    causation_id="evt-proposta-v1",
     payload={"evidence_kind": "FORECAST", "metric": "demanda", "value": 10,
              "unit": "GW", "source_refs": ["s1"], "method_version": "1.0.0",
-             "confidence": 0.7})),
+             "confidence": 0.7, "subject_ref": "archimedes_root_states:rs-1:1"})),
 
  ("JOHN recomenda alternativa fora de alternatives",
   False, _base(event_type="john.recommendation.generated",
@@ -734,22 +769,126 @@ CASOS = [
  ("ARCHIMEDES planning state valido",
   True, _base(event_type="archimedes.planning.state.authoritative",
     producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-state",
-    contract_version="1.0.0",
+    contract_version="2.0.0", causation_id="evt-proposta-v1",
     payload={"planning_request_id": "pr-continental-01",
              "state_status": "AUTHORITATIVE_OUTPUT",
              "territorial_scope": "CONTINENTAL", "crs": "EPSG:4326",
              "candidates": [{"candidate_id": "corredor-A", "where": {"lat": -15},
                              "why": "menor perda estimada", "rank": 1,
-                             "evidence_refs": ["ev1"], "method_version": "test-method/0.0", "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}}]})),
+                             "evidence_refs": ["ev1"]}]})),
 
  ("CEFEIDA evidence valida",
   True, _base(event_type="cefeida.evidence.published",
     producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
-    contract_version="1.0.0", observed_at="2026-08-29T00:00:00Z",
+    contract_version="2.0.0", observed_at="2026-08-29T00:00:00Z",
+    causation_id="evt-proposta-v1",
     payload={"evidence_kind": "FORECAST", "metric": "deficit_energetico",
              "value": 12.4, "unit": "GW", "confidence": 0.76, "horizon": "P30D",
              "source_refs": ["ons-2026-08"], "method_version": "2.1.0",
-             "subject_ref": "regiao-sul"})),
+             "subject_ref": "archimedes_root_states:rs-1:1"})),
+
+ # --- ADR-004 (kit 0.14.0): proposta, e os MAJORs de planning-state e cefeida ---
+ ("ARCHIMEDES proposta valida, study_basis=DECLARED sem metodo",
+  True, _base(event_type="archimedes.planning.proposal.published",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-proposal",
+    contract_version="1.0.0", causation_id="evt-hub-pedido-1",
+    artifact_id="archimedes_root_states:rs-1:1",
+    payload=_PROPOSTA)),
+
+ ("ARCHIMEDES proposta valida, study_basis=METHOD com versao",
+  True, _base(event_type="archimedes.planning.proposal.published",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-proposal",
+    contract_version="1.0.0", causation_id="evt-hub-pedido-1",
+    artifact_id="archimedes_root_states:rs-1:1",
+    payload={**_PROPOSTA, "study_basis": "METHOD",
+             "study_method_version": "site-screening/0.1"})),
+
+ ("ARCHIMEDES proposta METHOD sem study_method_version (metodo sem versao)",
+  False, _base(event_type="archimedes.planning.proposal.published",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-proposal",
+    contract_version="1.0.0", causation_id="evt-hub-pedido-1",
+    payload={**_PROPOSTA, "study_basis": "METHOD"})),
+
+ ("ARCHIMEDES proposta DECLARED com study_method_version (declarado nao tem metodo)",
+  False, _base(event_type="archimedes.planning.proposal.published",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-proposal",
+    contract_version="1.0.0", causation_id="evt-hub-pedido-1",
+    payload={**_PROPOSTA, "study_method_version": "site-screening/0.1"})),
+
+ ("ARCHIMEDES proposta sem causation_id (proposta sem pedido)",
+  False, _base(event_type="archimedes.planning.proposal.published",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-proposal",
+    contract_version="1.0.0", payload=_PROPOSTA)),
+
+ ("ARCHIMEDES proposta com evidence_refs (evidencia antes da proposta)",
+  False, _base(event_type="archimedes.planning.proposal.published",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-proposal",
+    contract_version="1.0.0", causation_id="evt-hub-pedido-1",
+    payload={**_PROPOSTA, "candidates": [{**_PROPOSTA["candidates"][0],
+                                          "evidence_refs": ["ev1"]}]})),
+
+ ("ARCHIMEDES proposta com decision_id (proposta nao decide)",
+  False, _base(event_type="archimedes.planning.proposal.published",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-proposal",
+    contract_version="1.0.0", causation_id="evt-hub-pedido-1", decision_id="d1",
+    payload=_PROPOSTA)),
+
+ ("ARCHIMEDES planning-state 2.0.0 sem causation_id (estado sem proposta)",
+  False, _base(event_type="archimedes.planning.state.authoritative",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-state",
+    contract_version="2.0.0",
+    payload={"planning_request_id": "pr1", "state_status": "AUTHORITATIVE_OUTPUT",
+             "territorial_scope": "CONTINENTAL",
+             "candidates": [{"candidate_id": "c1", "where": {}, "why": "w",
+                             "evidence_refs": ["ev1"]}]})),
+
+ ("ARCHIMEDES planning-state 2.0.0 candidate sem evidence_refs",
+  False, _base(event_type="archimedes.planning.state.authoritative",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-state",
+    contract_version="2.0.0", causation_id="evt-proposta-v1",
+    payload={"planning_request_id": "pr1", "state_status": "AUTHORITATIVE_OUTPUT",
+             "territorial_scope": "CONTINENTAL",
+             "candidates": [{"candidate_id": "c1", "where": {}, "why": "w"}]})),
+
+ ("ARCHIMEDES planning-state 2.0.0 candidate com evidence_refs vazio",
+  False, _base(event_type="archimedes.planning.state.authoritative",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-state",
+    contract_version="2.0.0", causation_id="evt-proposta-v1",
+    payload={"planning_request_id": "pr1", "state_status": "AUTHORITATIVE_OUTPUT",
+             "territorial_scope": "CONTINENTAL",
+             "candidates": [{"candidate_id": "c1", "where": {}, "why": "w",
+                             "evidence_refs": []}]})),
+
+ ("ARCHIMEDES planning-state 1.0.0 RETIRED (nao aceita publicacao)",
+  False, _base(event_type="archimedes.planning.state.authoritative",
+    producer_id="liceu.archimedes", contract_id="liceu.archimedes.planning-state",
+    contract_version="1.0.0",
+    payload={"planning_request_id": "pr1", "state_status": "AUTHORITATIVE_OUTPUT",
+             "territorial_scope": "CONTINENTAL",
+             "candidates": [{"candidate_id": "c1", "where": {}, "why": "w"}]})),
+
+ ("CEFEIDA evidence 2.0.0 sem causation_id (evidencia sem versao da proposta)",
+  False, _base(event_type="cefeida.evidence.published",
+    producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
+    contract_version="2.0.0", observed_at="2026-08-29T00:00:00Z",
+    payload={"evidence_kind": "METRIC", "metric": "m", "value": 1,
+             "unit": "u", "source_refs": ["s"], "method_version": "1.0.0",
+             "subject_ref": "archimedes_root_states:rs-1:1"})),
+
+ ("CEFEIDA evidence 2.0.0 sem subject_ref (evidencia sem objeto)",
+  False, _base(event_type="cefeida.evidence.published",
+    producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
+    contract_version="2.0.0", observed_at="2026-08-29T00:00:00Z",
+    causation_id="evt-proposta-v1",
+    payload={"evidence_kind": "METRIC", "metric": "m", "value": 1,
+             "unit": "u", "source_refs": ["s"], "method_version": "1.0.0"})),
+
+ ("CEFEIDA evidence 1.0.0 RETIRED (nao aceita publicacao)",
+  False, _base(event_type="cefeida.evidence.published",
+    producer_id="liceu.cefeida", contract_id="liceu.cefeida.evidence",
+    contract_version="1.0.0", observed_at="2026-08-29T00:00:00Z",
+    payload={"evidence_kind": "METRIC", "metric": "m", "value": 1,
+             "unit": "u", "source_refs": ["s"], "method_version": "1.0.0"})),
 
  ("ANCHOR DENIED valido (negacao tambem e fato)",
   True, _base(event_type="anchor.authorization.granted",
