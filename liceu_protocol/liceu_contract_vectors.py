@@ -99,6 +99,48 @@ def _tipo_errado(esquema: dict):
 
 # ─────────────────────────────────────────────────────── os vetores
 
+def _ajustar(payload: dict, esquema: dict, validador) -> tuple[dict | None, list[str]]:
+    """Faz o payload OBEDECER as condicionais do esquema, ou diz que nao da.
+
+    Ate a 0.17.0 o gerador so lia `properties`/`required`, entao para um esquema
+    com `if`/`then` ele produzia payload que o proprio contrato PROIBE — e depois
+    acusava o produtor que corretamente o recusava. Foi o caso do FORECAST sem
+    confidence. A saida era uma valvula (`condicionais`) onde o CONSUMIDOR
+    declarava a regra a mao.
+
+    Aqui a pergunta vai para quem sabe responder: o esquema. Cada erro de
+    `required` que a validacao aponta vira um campo acrescentado, com o exemplo
+    do proprio subesquema. Devolve (payload, campos_acrescentados), ou
+    (None, ...) quando o payload e invalido por motivo que nao se repara — e ai
+    ele nao era um vetor valido, e muda de lado.
+
+    Isto vale para QUALQUER construto do JSON Schema, e nao so `if`/`then`:
+    quem responde e a validacao, nao uma leitura minha do esquema.
+    """
+    props = esquema.get("properties") or {}
+    acrescentados: list[str] = []
+    for _ in range(8):                      # um reparo pode disparar o proximo
+        erros = list(validador.iter_errors(payload))
+        if not erros:
+            return payload, acrescentados
+        faltando = None
+        for e in erros:
+            for sub in ([e] + list(e.context or [])):
+                if sub.validator == "required" and sub.validator_value:
+                    ausentes = [c for c in sub.validator_value if c not in payload]
+                    if ausentes:
+                        faltando = ausentes[0]
+                        break
+            if faltando:
+                break
+        if faltando is None:
+            return None, acrescentados      # invalido por outro motivo
+        payload = {**payload, faltando: _exemplo(props.get(faltando) or {"type": "string"},
+                                                 faltando)}
+        acrescentados.append(faltando)
+    return None, acrescentados
+
+
 def vetores(payload_schema: dict) -> dict:
     """{validos: [{caso, payload}], invalidos: [{caso, payload, porque}]}"""
     props = payload_schema.get("properties") or {}
@@ -162,6 +204,42 @@ def vetores(payload_schema: dict) -> dict:
         p["campo_que_o_contrato_nao_declara"] = "x"
         invalidos.append({"caso": "campo a mais", "payload": p,
                           "porque": "additionalProperties: false"})
+
+    # ─────────── as condicionais do esquema, respondidas pelo esquema
+    # Cada valido passa pela validacao completa. O que so precisa de um campo
+    # exigido condicionalmente ganha esse campo — e o payload SEM ele vira um
+    # invalido novo, que e exatamente a regra condicional virada vetor. O que
+    # nao se repara nunca foi valido, e muda de lado com o motivo.
+    from jsonschema import Draft202012Validator
+    validador = Draft202012Validator(payload_schema)
+
+    ok, extras = [], []
+    for caso in validos:
+        ajustado, acrescentados = _ajustar(caso["payload"], payload_schema, validador)
+        if ajustado is None:
+            invalidos.append({"caso": f"{caso['caso']} (o esquema proibe)",
+                              "payload": caso["payload"],
+                              "porque": "condicional do esquema"})
+            continue
+        if acrescentados:
+            caso = {"caso": f"{caso['caso']} + condicional ({', '.join(acrescentados)})",
+                    "payload": ajustado}
+            for campo in acrescentados:
+                extras.append({"caso": f"{campo}: exigido pela condicional do esquema",
+                               "payload": {k: v for k, v in ajustado.items() if k != campo},
+                               "porque": "if/then do payload_schema"})
+        ok.append(caso)
+    validos = ok
+    vistos = {c["caso"] for c in invalidos}
+    for e in extras:
+        if e["caso"] not in vistos:
+            invalidos.append(e)
+            vistos.add(e["caso"])
+
+    # E o outro lado: um "invalido" que o esquema ACEITA nao e invalido. Deixa-lo
+    # na lista faria o relatorio cobrar do produtor uma recusa que o contrato
+    # nao autoriza — o erro que este modulo existe para nao cometer.
+    invalidos = [c for c in invalidos if validador.iter_errors(c["payload"])]
 
     return {"validos": validos, "invalidos": invalidos}
 
@@ -311,6 +389,34 @@ def _self_test() -> int:
     probs = conferir(exige_confidence, "x", "1.0.0", reg_cond)
     diz(any("RECUSA O QUE O CONTRATO ADMITE" in p and "FORECAST" in p for p in probs),
         "sem a declaracao, a mesma recusa e acusada — a valvula nao e silenciosa")
+
+    # a mesma condicional, agora NO ESQUEMA: o gerador nao precisa mais que
+    # ninguem lhe conte a regra
+    esq_schema = {
+        "type": "object", "required": ["kind"], "additionalProperties": False,
+        "properties": {"kind": {"type": "string", "enum": ["OBSERVATION", "FORECAST"]},
+                       "confidence": {"type": "number"}},
+        "allOf": [{"if": {"properties": {"kind": {"const": "FORECAST"}},
+                          "required": ["kind"]},
+                   "then": {"required": ["confidence"]}}],
+    }
+    reg_schema = {"x": {"1.0.0": {"payload_schema": esq_schema}}}
+    vs = do_contrato("x", "1.0.0", reg_schema)
+
+    forecasts = [c for c in vs["validos"] if c["payload"].get("kind") == "FORECAST"]
+    diz(bool(forecasts) and all("confidence" in c["payload"] for c in forecasts),
+        "o valido de FORECAST ja nasce com o campo que a condicional exige")
+    diz(any(c["caso"] == "confidence: exigido pela condicional do esquema"
+            for c in vs["invalidos"]),
+        "a condicional do esquema vira vetor INVALIDO — a regra virou teste")
+    diz(all(not list(__import__("jsonschema").Draft202012Validator(esq_schema)
+                     .iter_errors(c["payload"])) for c in vs["validos"]),
+        "nenhum valido do gerador e recusado pelo proprio esquema")
+
+    probs = conferir(exige_confidence, "x", "1.0.0", reg_schema)   # SEM valvula
+    diz(not any("RECUSA O QUE O CONTRATO ADMITE" in p for p in probs),
+        "com a condicional no esquema, o produtor passa SEM a valvula — o que a "
+        "B3 so conseguia com declaracao a mao")
 
     print(f"\n{'TODOS OS CASOS CORRETOS' if ok else 'HOUVE FALHA'}")
     return 0 if ok else 1
