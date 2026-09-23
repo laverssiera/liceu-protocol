@@ -54,7 +54,7 @@ import datetime
 
 import yaml
 
-CHECKER_VERSION = "1.6.0"
+CHECKER_VERSION = "1.6.1"
 
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 PRODUCER_ID = re.compile(r"^liceu\.[a-z][a-z0-9-]*$")
@@ -91,6 +91,14 @@ class LoaderEstrito(yaml.SafeLoader):
 def _mapa_estrito(loader, node, deep=False):
     vistas = set()
     for chave_node, _ in node.value:
+        # `<<: *ancora` e FUSAO, nao chave: aparece uma vez por ancora fundida e
+        # e legitimo. Quem substitui a chave herdada depois esta usando o
+        # mecanismo, nao duplicando. O SafeLoader resolve isso no
+        # flatten_mapping, e por isso a conferencia acontece ANTES dele, sobre
+        # as chaves que o autor de fato escreveu. Sem esta linha o loader
+        # quebrava em todo YAML com ancora — achado ao liga-lo no genoma.
+        if chave_node.tag == "tag:yaml.org,2002:merge":
+            continue
         chave = loader.construct_object(chave_node, deep=deep)
         try:
             repetida = chave in vistas
@@ -488,6 +496,18 @@ payload_schema:
         "chave duplicada em mapa ANINHADO tambem e recusada")
     diz(recusa("lista:\n- k: 1\n  k: 2\n") is not None,
         "chave duplicada dentro de item de lista tambem e recusada")
+
+    # ANCORA DE FUSAO. O `<<` e chave repetida aos olhos do parser, e a primeira
+    # versao deste loader quebrava em TODO yaml com ancora — so apareceu ao
+    # liga-lo no genoma, que usa fusao no grafo. O consumidor achou o defeito
+    # que o pacote nao tinha como achar sozinho.
+    fusao = "base: &b\n  a: 1\n  b: 2\n"
+    diz(carregar_estrito(fusao + "filho:\n  <<: *b\n  c: 3\n")["filho"] == {"a": 1, "b": 2, "c": 3},
+        "ancora de fusao carrega — `<<` nao e chave duplicada")
+    diz(carregar_estrito(fusao + "filho:\n  <<: *b\n  a: 9\n")["filho"] == {"a": 9, "b": 2},
+        "substituir chave HERDADA e o mecanismo funcionando, e nao duplicata")
+    diz(recusa(fusao + "filho:\n  <<: *b\n  c: 3\n  c: 4\n") is not None,
+        "e a duplicata de verdade AO LADO da fusao continua sendo pega")
 
     diz(recusa("a: 1\nb: 2\n") is None, "yaml sem duplicata passa — controle positivo")
     diz(carregar_estrito("a: 1\nb: [1, 2]\n") == {"a": 1, "b": [1, 2]},
