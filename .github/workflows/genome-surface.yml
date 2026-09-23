@@ -1,0 +1,34 @@
+name: Superficie provada pelo genoma
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  superficie-provada:
+    # A PRF-0037 do genoma declara uma superficie NESTE repositorio
+    # (liceu_protocol/liceu_contract_vectors.py). Sem este passo, o campo
+    # `mechanism` seria decorativo: a prova diria cobrir um arquivo que ninguem
+    # confere, e o gerador de vetores poderia ser reescrito sem que a prova
+    # fosse refeita. A invalidacao acontece ONDE A MUDANCA ACONTECE.
+    #
+    # O genoma (liceu-genome) e PUBLICO: esta CI o le, pega as provas cujo
+    # mechanism.repo e liceu-protocol, recalcula o hash da superficie e falha
+    # aqui se mudou. Sem token, e sem ninguem escrever no repositorio de ninguem.
+    name: A superficie provada deste repositorio mudou?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pyyaml==6.0.3
+      - name: Baixar o detector e o genoma publico
+        run: |
+          curl -fsSL -o /tmp/genome_surface_check.py \
+            https://raw.githubusercontent.com/laverssiera/liceu-genome/main/tools/genome_surface_check.py
+          curl -fsSL -o /tmp/07-proofs.yaml \
+            https://raw.githubusercontent.com/laverssiera/liceu-genome/main/genome/07-proofs.yaml
+      - name: A superficie provada deste repositorio mudou?
+        run: python /tmp/genome_surface_check.py --repo liceu-protocol --root . --proofs /tmp/07-proofs.yaml
