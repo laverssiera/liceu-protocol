@@ -59,8 +59,22 @@ def _exemplo(esquema: dict, semente: str = "x"):
         return esquema["enum"][0]
     if "const" in esquema:
         return esquema["const"]
+    # Uma condicional se escreve com `anyOf`/`oneOf` e com `contains`, e sem
+    # ler os dois nao da para construir o payload que ACIONA a condicional —
+    # e regra que nao se aciona nao vira vetor nenhum.
+    for ramo in ("anyOf", "oneOf"):
+        if esquema.get(ramo):
+            return _exemplo({**{k: v for k, v in esquema.items() if k != ramo},
+                             **esquema[ramo][0]}, semente)
     tipos = esquema.get("type")
     tipo = tipos[0] if isinstance(tipos, list) else tipos
+    # subesquema de `if` nao declara `type`: quem tem properties/required e objeto
+    if tipo is None and ("properties" in esquema or "required" in esquema):
+        tipo = "object"
+    if tipo is None and "contains" in esquema:
+        tipo = "array"
+    if tipo == "array" and esquema.get("contains"):
+        return [_exemplo(esquema["contains"], semente)]
     if tipo == "object":
         obj = {}
         props = esquema.get("properties") or {}
@@ -98,6 +112,22 @@ def _tipo_errado(esquema: dict):
 
 
 # ─────────────────────────────────────────────────────── os vetores
+
+def _fundir(alvo, novo):
+    """Funde `novo` em `alvo` sem perder o que o alvo ja tinha.
+
+    Substituir seria facil e errado: o candidate do payload minimo ja carrega
+    candidate_id, why e evidence_refs, e o exemplo do `if` so traz o que aciona
+    a condicional. Array funde ELEMENTO A ELEMENTO, pelo mesmo motivo.
+    """
+    if isinstance(alvo, dict) and isinstance(novo, dict):
+        for k, v in novo.items():
+            alvo[k] = _fundir(alvo.get(k), v) if k in alvo else v
+        return alvo
+    if isinstance(alvo, list) and isinstance(novo, list) and alvo:
+        return [_fundir(a, novo[0]) if i == 0 else a for i, a in enumerate(alvo)]
+    return novo if alvo is None else (novo if not isinstance(alvo, (dict, list)) else alvo)
+
 
 COND_ESQUEMA = ("if", "then", "else", "allOf", "anyOf", "oneOf", "not", "dependentRequired")
 
@@ -156,7 +186,13 @@ def _ajustar(payload: dict, esquema: dict, validador) -> tuple[dict | None, list
         reparo = None
         for e in erros:
             for sub in ([e] + list(e.context or [])):
-                if sub.validator == "required" and sub.validator_value:
+                # So o TOPO se repara. Um `required` que veio de dentro de um
+                # item de array tem caminho proprio, e acrescentar aquele nome
+                # na raiz do payload inventaria um campo que o contrato nao
+                # declara — bug encontrado ao gerar o vetor que aciona a
+                # condicional do `crs`.
+                if (sub.validator == "required" and sub.validator_value
+                        and not list(sub.absolute_path)):
                     ausentes = [c for c in sub.validator_value if c not in payload]
                     if ausentes:
                         reparo = ("required", ausentes[0], sub)
@@ -260,6 +296,19 @@ def vetores(payload_schema: dict) -> dict:
     from jsonschema import Draft202012Validator
     validador = Draft202012Validator(payload_schema)
     condicionados = _campos_condicionados(payload_schema)
+
+    # Um vetor por CONDICIONAL, construido para ACIONA-LA. Sem isto, uma
+    # condicional cujo `if` o payload minimo nao satisfaz fica sem vetor
+    # nenhum: a regra entra no contrato e nada a exercita. Foi o caso do
+    # `crs obrigatorio quando ha geometria`, em que o `where` do minimo e
+    # vazio e a condicional nunca disparava.
+    for i, ramo in enumerate(payload_schema.get("allOf") or []):
+        if not isinstance(ramo, dict) or "if" not in ramo:
+            continue
+        gatilho = _fundir(copy.deepcopy(base), _exemplo(ramo["if"]))
+        if isinstance(gatilho, dict):
+            validos.append({"caso": f"condicional {i + 1}: payload que a ACIONA",
+                            "payload": gatilho})
 
     ok, extras = [], []
     for caso in validos:
@@ -505,6 +554,32 @@ def _self_test() -> int:
     diz(sum(1 for c in vm["invalidos"]
             if c["caso"].startswith("itens:") and "condicional" in c["caso"]) == 1,
         "campo ja obrigatorio nao ganha vetor repetido por ser condicionado")
+
+    # a condicional que so dispara com o CONTEUDO de um item de array — o caso
+    # do `crs obrigatorio quando ha geometria`
+    esq_geo = {
+        "type": "object", "required": ["itens"], "additionalProperties": False,
+        "properties": {"crs": {"type": "string"},
+                       "itens": {"type": "array", "minItems": 1, "items": {
+                           "type": "object", "required": ["id", "onde"],
+                           "properties": {"id": {"type": "string"}, "onde": {"type": "object"}}}}},
+        "allOf": [{"if": {"properties": {"itens": {"contains": {
+                              "type": "object", "required": ["onde"],
+                              "properties": {"onde": {"anyOf": [{"required": ["coordinates"]},
+                                                                {"required": ["lat"]}]}}}}},
+                          "required": ["itens"]},
+                   "then": {"required": ["crs"]}}],
+    }
+    vg = do_contrato("x", "1.0.0", {"x": {"1.0.0": {"payload_schema": esq_geo}}})
+    acionam = [c for c in vg["validos"] if "ACIONA" in c["caso"]]
+    diz(bool(acionam), "cada condicional ganha um valido construido para ACIONA-LA")
+    diz(any("coordinates" in (c["payload"]["itens"][0].get("onde") or {}) and c["payload"].get("crs")
+            for c in acionam),
+        "o valido que aciona vem COMPLETO: com a coordenada e com o crs que ela exige")
+    diz(all(c["payload"]["itens"][0].get("id") is not None for c in acionam),
+        "acionar a condicional nao apaga o que o item ja tinha — a fusao preserva")
+    diz(any(c["caso"] == "crs: exigido pela condicional do esquema" for c in vg["invalidos"]),
+        "e o payload com coordenada e SEM crs vira o vetor invalido")
 
     print(f"\n{'TODOS OS CASOS CORRETOS' if ok else 'HOUVE FALHA'}")
     return 0 if ok else 1

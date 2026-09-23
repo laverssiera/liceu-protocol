@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.11.0
+  registry_version: 2.12.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -131,7 +131,7 @@ contracts:
       - study_basis = METHOD exige study_method_version; study_basis = DECLARED proibe study_method_version (schema)
       - candidates nao vazio
       - cada candidate tem why
-      - crs obrigatorio quando ha geometria
+      - 'crs obrigatorio quando ha geometria — codificado no payload_schema (if/then com contains), nao em prosa. HA GEOMETRIA quando algum candidate traz coordenada no `where`: GeoJSON (`coordinates`) ou par `lat`/`lon`. Onde o `where` so tem atributo — municipio, zona, areas, como na P-001 — nao ha geometria e o crs nao e exigido. A definicao foi escrita a partir do uso real do ecossistema, em que os dois payloads com coordenada ja declaravam crs; se ela estiver errada, o lugar de corrigir e aqui.'
       payload_schema:
         type: object
         required:
@@ -217,6 +217,27 @@ contracts:
             not:
               required:
               - study_method_version
+        - if:
+            properties:
+              candidates:
+                contains:
+                  type: object
+                  required:
+                  - where
+                  properties:
+                    where:
+                      anyOf:
+                      - required:
+                        - coordinates
+                      - required:
+                        - lat
+                      - required:
+                        - lon
+            required:
+            - candidates
+          then:
+            required:
+            - crs
       status: ACTIVE
   liceu.archimedes.planning-state:
     2.0.0:
@@ -252,7 +273,7 @@ contracts:
       domain_invariants:
       - candidates nao vazio quando state_status = AUTHORITATIVE_OUTPUT — codificado no payload_schema (if/then com minItems), nao em prosa
       - cada candidate tem why (justificativa rastreavel a evidencia)
-      - 'crs obrigatorio quando ha geometria — CONTINUA SO EM PROSA, e de proposito. O campo `where` do candidate e declarado apenas como objeto, sem estrutura, e no uso real aparece em tres formas incompativeis: GeoJSON, par lat/lon, e so atributos (municipio, zona, areas) — que e o caso da P-001, onde nao ha geometria nenhuma. Dizer QUANDO ha geometria exige decidir o que conta como geometria, e isso e decisao de contrato, nao de codificacao. Divida VIO-0007 no genoma.'
+      - 'crs obrigatorio quando ha geometria — codificado no payload_schema (if/then com contains), nao em prosa. HA GEOMETRIA quando algum candidate traz coordenada no `where`: GeoJSON (`coordinates`) ou par `lat`/`lon`. Onde o `where` so tem atributo — municipio, zona, areas, como na P-001 — nao ha geometria e o crs nao e exigido. A definicao foi escrita a partir do uso real do ecossistema, em que os dois payloads com coordenada ja declaravam crs; se ela estiver errada, o lugar de corrigir e aqui.'
       payload_schema:
         type: object
         required:
@@ -272,6 +293,27 @@ contracts:
             properties:
               candidates:
                 minItems: 1
+        - if:
+            properties:
+              candidates:
+                contains:
+                  type: object
+                  required:
+                  - where
+                  properties:
+                    where:
+                      anyOf:
+                      - required:
+                        - coordinates
+                      - required:
+                        - lat
+                      - required:
+                        - lon
+            required:
+            - candidates
+          then:
+            required:
+            - crs
         properties:
           planning_request_id:
             type: string
