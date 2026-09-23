@@ -46,6 +46,13 @@ jobs:
       - name: Federation SDK self-test (liceu_federation_sdk.py) # esperado: 32/32
         run: python liceu_federation_sdk.py --self-test
 
+      # B3 (ciclo 11): os vetores que cada produtor tem de aceitar e recusar
+      # saem do payload_schema do proprio contrato. O self-test prova que o
+      # gerador PEGA um produtor mais estreito que o contrato — foi assim que
+      # o CEFEIDA apareceu, depois de travar a cadeia.
+      - name: Vetores de contrato (self-test)
+        run: python liceu_contract_vectors.py --self-test
+
   package:
     name: pip install . e MANIFEST no pacote instalado
     runs-on: ubuntu-latest
