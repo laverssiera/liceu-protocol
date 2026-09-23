@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.8.0
+  registry_version: 2.9.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -443,7 +443,7 @@ contracts:
       domain_invariants:
       - source_refs nao vazio — evidencia sem fonte nao e evidencia
       - method_version presente para reproducibilidade
-      - confidence obrigatorio quando kind = FORECAST
+      - confidence E horizon obrigatorios quando evidence_kind = FORECAST — codificado no payload_schema (if/then), nao em prosa. O campo chama-se evidence_kind, e nao kind; o horizon estava so na description, que e um esconderijo pior que domain_invariants
       payload_schema:
         type: object
         required:
@@ -455,6 +455,17 @@ contracts:
         - method_version
         - subject_ref
         additionalProperties: false
+        allOf:
+        - if:
+            properties:
+              evidence_kind:
+                const: FORECAST
+            required:
+            - evidence_kind
+          then:
+            required:
+            - confidence
+            - horizon
         properties:
           evidence_kind:
             type: string
