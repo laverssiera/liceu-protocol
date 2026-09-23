@@ -512,6 +512,17 @@ producers:
     authority_class: Authority Control Plane
     producer_kind: AUTHORITY_CONTROL_PLANE
     repository: null
+    # B4 (ciclo 11): `repository: null` e DELIBERADO — o control plane nao e monolito
+    # soberano e por isso nao tem repositorio proprio. So que ate aqui nada dizia, em
+    # campo que uma maquina leia, ONDE ele esta. `hosted_in` diz: o codigo vive no
+    # repositorio do produtor nomeado, e e la que se confere. O campo
+    # NAO_E_MONOLITO_SOBERANO explica para humano; este explica para o juiz.
+    hosted_in: liceu.core
+    hosted_in_reason: O Authority Control Plane e implementado no repositorio do liceu.core,
+      em cv-backend-core/app/services/authority_control_plane.py — attest, promote, a tabela
+      authority_instances e a regra de que o papel se deriva da identidade AUTENTICADA da
+      instancia, nunca de campo do payload. Nao ha repositorio proprio porque nao ha dominio
+      proprio.
     wave: null
     NAO_E_MONOLITO_SOBERANO: os 15 monolitos continuam sendo os produtores soberanos dos respectivos dominios.
       liceu.authority nao possui engenharia, capital, territorio, direito, execucao nem qualquer estado
