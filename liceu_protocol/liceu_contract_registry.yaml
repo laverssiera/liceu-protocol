@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.10.0
+  registry_version: 2.11.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -1257,7 +1257,7 @@ contracts:
       - lineage ate o impacto economico que originou a exposicao e obrigatoria
       domain_invariants:
       - economic_impact_id nao vazio — exposicao sem impacto de origem nao e rastreavel
-      - npv presente quando financial_viability != inviavel
+      - 'npv obrigatorio SEMPRE, e nao condicional: esta em `required` do payload_schema desde a 1.0.0, e o CEA o calcula em toda execucao — inclusive nos casos de financial_viability inviavel, em que o NPV negativo E o resultado. A redacao anterior prometia uma excecao para o caso inviavel que o esquema nunca admitiu e que produtor nenhum usou; nao ha condicional aqui para codificar. Se a excecao for real, a correcao e a inversa — tirar npv de required e por if/then — e e decisao de contrato.'
       - scenarios contem ao menos o cenario base
       payload_schema:
         type: object
@@ -1495,6 +1495,19 @@ contracts:
         - signed_at
         - nonce
         - witness_attestation
+        allOf:
+        - if:
+            properties:
+              escalation_reason:
+                const: MOTHERS_UNAVAILABLE
+            required:
+            - escalation_reason
+          then:
+            required:
+            - maes_indisponiveis
+            properties:
+              maes_indisponiveis:
+                minItems: 1
         properties:
           decision_id:
             type: string
@@ -1513,7 +1526,6 @@ contracts:
             type: array
             items:
               type: string
-            condicional: obrigatorio SOMENTE quando escalation_reason == MOTHERS_UNAVAILABLE
           evidencias_consideradas:
             type: array
             items:
@@ -1586,8 +1598,7 @@ contracts:
         NUNCA do payload
       domain_invariants:
       - escalation_reason obrigatorio — o motivo do escalonamento e parte do fato
-      - maes_indisponiveis obrigatorio SOMENTE se escalation_reason == MOTHERS_UNAVAILABLE; nos demais
-        casos as Maes podem estar disponiveis
+      - 'maes_indisponiveis obrigatorio SOMENTE quando escalation_reason == MOTHERS_UNAVAILABLE, e nao vazio — codificado no payload_schema (if/then com minItems), nao em prosa. Nos demais casos as Maes podem estar disponiveis, e o campo nao e exigido.'
       - evidencias_consideradas nao pode ser vazio — decisao sem evidencia e proibida
       - alternativas nao pode ser vazio
       - 'causation_id obrigatorio: a decisao humana tem origem causal'
