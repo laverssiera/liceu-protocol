@@ -181,13 +181,47 @@ def do_contrato(contract_id: str, version: str, registry: dict | None = None) ->
     return vetores(esquema)
 
 
-def conferir(aceita, contract_id: str, version: str, registry: dict | None = None) -> list[str]:
+def conferir(aceita, contract_id: str, version: str, registry: dict | None = None,
+             condicionais: list[tuple] | None = None) -> list[str]:
     """`aceita(payload) -> (bool, motivo)`. Devolve os problemas encontrados.
 
     A falha que importa esta primeiro: RECUSAR o que o contrato admite.
+
+    `condicionais` e a parte honesta e incomoda deste metodo. Alguns contratos
+    declaram exigencia CONDICIONAL em prosa — "confidence obrigatorio quando
+    kind = FORECAST" — e o payload_schema nao a carrega. Um gerador que le so o
+    esquema produz payload que o contrato PROIBE, e o produtor que o recusa
+    esta certo. Enquanto a condicional nao estiver no esquema (`if`/`then`,
+    `dependentRequired`), quem chama declara aqui:
+
+        condicionais=[(lambda p: p.get("evidence_kind") == "FORECAST"
+                                 and "confidence" not in p,
+                       'domain_invariant: "confidence obrigatorio quando kind = FORECAST"')]
+
+    Cada par e (predicado, citacao). O predicado verdadeiro move o vetor de
+    valido para invalido — o produtor TEM de recusa-lo. A citacao existe para
+    que ninguem silencie um vetor sem apontar a linha do contrato que autoriza.
     """
     v = do_contrato(contract_id, version, registry)
     problemas = []
+    condicionais = condicionais or []
+
+    def proibido_por_invariante(payload):
+        for pred, citacao in condicionais:
+            if pred(payload):
+                return citacao
+        return None
+
+    movidos = []
+    restam = []
+    for caso in v["validos"]:
+        citacao = proibido_por_invariante(caso["payload"])
+        if citacao:
+            movidos.append({**caso, "porque": citacao})
+        else:
+            restam.append(caso)
+    v["validos"], v["invalidos"] = restam, v["invalidos"] + movidos
+
     for caso in v["validos"]:
         ok, motivo = aceita(caso["payload"])
         if not ok:
@@ -254,6 +288,29 @@ def _self_test() -> int:
     probs = conferir(lambda p: (True, ""), "x", "1.0.0", {"x": {"1.0.0": {"payload_schema": esquema}}})
     diz(any("aceita o que o contrato proibe" in p for p in probs),
         "o produtor que aceita tudo tambem e pego")
+
+    # a exigencia CONDICIONAL que so existe na prosa do contrato
+    esq_cond = {
+        "type": "object", "required": ["kind"],
+        "properties": {"kind": {"type": "string", "enum": ["OBSERVATION", "FORECAST"]},
+                       "confidence": {"type": "number"}},
+    }
+    reg_cond = {"x": {"1.0.0": {"payload_schema": esq_cond}}}
+
+    def exige_confidence(p):
+        if p.get("kind") == "FORECAST" and "confidence" not in p:
+            return False, "confidence_missing"
+        return True, ""
+
+    citacao = 'domain_invariant: "confidence obrigatorio quando kind = FORECAST"'
+    probs = conferir(exige_confidence, "x", "1.0.0", reg_cond,
+                     [(lambda p: p.get("kind") == "FORECAST" and "confidence" not in p, citacao)])
+    diz(not any("RECUSA O QUE O CONTRATO ADMITE" in p for p in probs),
+        "a condicional declarada com citacao tira o falso positivo do FORECAST")
+
+    probs = conferir(exige_confidence, "x", "1.0.0", reg_cond)
+    diz(any("RECUSA O QUE O CONTRATO ADMITE" in p and "FORECAST" in p for p in probs),
+        "sem a declaracao, a mesma recusa e acusada — a valvula nao e silenciosa")
 
     print(f"\n{'TODOS OS CASOS CORRETOS' if ok else 'HOUVE FALHA'}")
     return 0 if ok else 1
