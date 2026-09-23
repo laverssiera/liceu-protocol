@@ -27,6 +27,8 @@ VERIFICACOES
   R11  a cadeia causal minima esta completa e ordenada
   R12  capacidades declaradas coerentes com o plano de autoridade
   R00  integridade do pacote: todo artifact governado presente
+  R0E  nenhum artifact governado tem chave duplicada: o YAML fica com a
+       ULTIMA e descarta a primeira, SEM ERRO, e a regra perdida nao volta
   R0C  autoconsistencia da Constituicao: meta.versao == milestone.
        current_constitution_version (M1.baseline_constitution_version e
        historico e pode divergir de proposito)
@@ -50,7 +52,9 @@ import re
 import sys
 import datetime
 
-CHECKER_VERSION = "1.5.0"
+import yaml
+
+CHECKER_VERSION = "1.6.0"
 
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 PRODUCER_ID = re.compile(r"^liceu\.[a-z][a-z0-9-]*$")
@@ -59,6 +63,52 @@ GEOGRAFIA = re.compile(r"\b(earth|terra|mars|marte|luna|moon|orbital|"
                        r"southamerica|europe|asia)\b", re.I)
 
 ERRO, AVISO = "ERRO", "AVISO"
+
+
+# ─────────────────────────────────────────── R0E: chave duplicada e regra perdida
+# O YAML aceita a mesma chave duas vezes no mesmo mapa e fica com a ULTIMA, sem
+# erro nenhum. Aconteceu de verdade em 2026-09-23: um segundo `allOf:` foi
+# escrito no payload_schema de liceu.archimedes.planning-proposal, o primeiro —
+# com a regra do study_basis — foi descartado em silencio, e nada acusou. So
+# apareceu porque alguem foi MEDIR o resultado em vez de confiar no diff.
+#
+# Um artifact governado que perde uma regra sem avisar e a falha mais cara que
+# este pacote pode ter: o contrato continua "valido", o boundary continua
+# passando, e a regra simplesmente nao existe mais.
+class ChaveDuplicada(Exception):
+    """Carrega onde: (arquivo, linha, coluna, chave)."""
+
+    def __init__(self, chave, marca):
+        self.chave, self.marca = chave, marca
+        super().__init__(f"chave duplicada {chave!r} na linha {marca.line + 1}, "
+                         f"coluna {marca.column + 1}")
+
+
+class LoaderEstrito(yaml.SafeLoader):
+    """SafeLoader que RECUSA mapa com chave repetida, em qualquer profundidade."""
+
+
+def _mapa_estrito(loader, node, deep=False):
+    vistas = set()
+    for chave_node, _ in node.value:
+        chave = loader.construct_object(chave_node, deep=deep)
+        try:
+            repetida = chave in vistas
+        except TypeError:                       # chave nao hashavel: o YAML ja recusa
+            repetida = False
+        if repetida:
+            raise ChaveDuplicada(chave, chave_node.start_mark)
+        vistas.add(chave)
+    return yaml.SafeLoader.construct_mapping(loader, node, deep=deep)
+
+
+LoaderEstrito.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _mapa_estrito)
+
+
+def carregar_estrito(texto_ou_bytes):
+    """`yaml.safe_load`, mas chave duplicada levanta ChaveDuplicada."""
+    return yaml.load(texto_ou_bytes, LoaderEstrito)
 
 
 class Resultado:
@@ -391,6 +441,78 @@ def verificar(const, prod_reg, contract_reg, event_reg, ledger, hashes) -> Resul
     return r
 
 
+def _self_test() -> int:
+    """R0E — o caso real de 2026-09-23, fixado como teste.
+
+    Um verificador que nunca acusou pode estar passando porque nao olha. Aqui
+    a chave duplicada e escrita de proposito, e o loader TEM de recusar.
+    """
+    ok = True
+
+    def diz(cond, msg):
+        nonlocal ok
+        print(f"  [{'OK  ' if cond else 'FALHA'}] {msg}")
+        ok = ok and cond
+
+    def recusa(texto):
+        try:
+            carregar_estrito(texto)
+            return None
+        except ChaveDuplicada as e:
+            return e
+
+    # O CASO REAL: dois `allOf` no mesmo payload_schema. O yaml.safe_load fica
+    # com o ultimo e a regra do primeiro some sem erro nenhum.
+    caso_real = """
+payload_schema:
+  type: object
+  allOf:
+  - if: {properties: {study_basis: {const: METHOD}}}
+    then: {required: [study_method_version]}
+  allOf:
+  - if: {properties: {candidates: {contains: {required: [where]}}}}
+    then: {required: [crs]}
+"""
+    import yaml as _y
+    frouxo = _y.safe_load(caso_real)
+    diz(len(frouxo["payload_schema"]["allOf"]) == 1
+        and "crs" in str(frouxo["payload_schema"]["allOf"]),
+        "o safe_load PERDE o primeiro allOf em silencio — o defeito que R0E fecha")
+    e = recusa(caso_real)
+    diz(e is not None and e.chave == "allOf", "o loader estrito recusa o allOf duplicado")
+    diz(e is not None and e.marca.line + 1 == 7,
+        "e aponta a LINHA da segunda ocorrencia, para nao procurar no escuro")
+
+    diz(recusa("a: 1\nb: 2\na: 3\n") is not None, "chave duplicada na raiz e recusada")
+    diz(recusa("x:\n  y:\n    z: 1\n    z: 2\n") is not None,
+        "chave duplicada em mapa ANINHADO tambem e recusada")
+    diz(recusa("lista:\n- k: 1\n  k: 2\n") is not None,
+        "chave duplicada dentro de item de lista tambem e recusada")
+
+    diz(recusa("a: 1\nb: 2\n") is None, "yaml sem duplicata passa — controle positivo")
+    diz(carregar_estrito("a: 1\nb: [1, 2]\n") == {"a": 1, "b": [1, 2]},
+        "e o valor lido continua o mesmo do safe_load")
+
+    # os artifacts REAIS do pacote carregam limpos
+    import os
+    aqui = os.path.dirname(os.path.abspath(__file__))
+    limpos = True
+    for nome in ARTIFACTS_GOVERNADOS:
+        caminho = os.path.join(aqui, nome)
+        if not os.path.exists(caminho):
+            continue
+        try:
+            with open(caminho, "rb") as f:
+                carregar_estrito(f.read())
+        except ChaveDuplicada as exc:
+            limpos = False
+            print(f"        {nome}: {exc}")
+    diz(limpos, "os artifacts governados deste pacote nao tem chave duplicada")
+
+    print(f"\n{'TODOS OS CASOS CORRETOS' if ok else 'HOUVE FALHA'}")
+    return 0 if ok else 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--constitution", default="liceu_constitution.yaml")
@@ -403,7 +525,12 @@ def main() -> int:
                     help="diretorio do pacote a verificar (R00)")
     ap.add_argument("--write-manifest", metavar="ARQ",
                     help="gera MANIFEST com sha256 de cada peca")
+    ap.add_argument("--self-test", action="store_true",
+                    help="R0E: prova que a chave duplicada e recusada")
     a = ap.parse_args()
+
+    if a.self_test:
+        return _self_test()
 
     # --package-dir precisa resolver TAMBEM os caminhos dos artifacts, nao so
     # o R00. Sem isto, rodar de um cwd diferente do pacote (o caso do CI, que
@@ -416,12 +543,19 @@ def main() -> int:
             if not _os.path.isabs(v) and not _os.path.exists(v):
                 setattr(a, campo, _os.path.join(a.package_dir, v))
 
-    import yaml
+    # R0E — carga ESTRITA. Chave duplicada nao vira aviso nem TODO: derruba a
+    # verificacao antes de qualquer regra, porque um artifact que perdeu uma
+    # regra em silencio nao e um artifact sobre o qual valha a pena opinar.
+    duplicadas = []
 
     def carregar(p):
         with open(p, "rb") as f:
             b = f.read()
-        return yaml.safe_load(b), hashlib.sha256(b).hexdigest()
+        try:
+            return carregar_estrito(b), hashlib.sha256(b).hexdigest()
+        except ChaveDuplicada as e:
+            duplicadas.append((p, e))
+            return yaml.safe_load(b), hashlib.sha256(b).hexdigest()
 
     const, csha = carregar(a.constitution)
     prod, _ = carregar(a.producers)
@@ -431,6 +565,15 @@ def main() -> int:
         led, _ = carregar(a.ledger)
     except OSError:
         led = {"meta": {}}
+
+    if duplicadas:
+        print("CHAVE DUPLICADA EM ARTIFACT GOVERNADO\n")
+        for caminho, e in duplicadas:
+            print(f"  x {caminho}: {e}")
+        print("\nO YAML fica com a ULTIMA ocorrencia e descarta a primeira, SEM ERRO.")
+        print("A regra que estava na primeira deixou de existir e nada acusaria.")
+        print("Corrija o arquivo: uma chave por mapa, e ramos de `allOf` na MESMA lista.")
+        return 1
 
     hashes = {
         "constitution_sha256": csha,

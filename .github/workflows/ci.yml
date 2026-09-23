@@ -40,6 +40,14 @@ jobs:
       - name: Registry consistency (liceu_registry_check.py)   # esperado: 0 erros
         run: python liceu_registry_check.py
 
+      # R0E: chave duplicada em YAML faz o parser ficar com a ULTIMA e descartar
+      # a primeira, sem erro. Aconteceu em 2026-09-23 com um segundo `allOf:` no
+      # payload_schema, e a regra do primeiro sumiu em silencio. O self-test
+      # prova que o loader estrito RECUSA — verificacao que nunca acusou pode
+      # estar passando porque nao olha.
+      - name: Chave duplicada em YAML (self-test do R0E)
+        run: python liceu_registry_check.py --self-test
+
       - name: Conformance self-test (liceu_conformance.py)      # esperado: 59/59
         run: python liceu_conformance.py --self-test
 
