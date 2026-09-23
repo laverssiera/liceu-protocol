@@ -99,6 +99,35 @@ def _tipo_errado(esquema: dict):
 
 # ─────────────────────────────────────────────────────── os vetores
 
+COND_ESQUEMA = ("if", "then", "else", "allOf", "anyOf", "oneOf", "not", "dependentRequired")
+
+
+def _campos_condicionados(no, dentro: bool = False) -> set:
+    """Campos que aparecem SOB construto condicional do esquema.
+
+    Sao eles que viram vetor invalido: tirar um campo que o esquema so exige
+    em certas condicoes e a unica forma de a regra condicional virar teste.
+    """
+    achados: set = set()
+    if isinstance(no, dict):
+        for k, v in no.items():
+            if k in COND_ESQUEMA:
+                achados |= _campos_condicionados(v, True)
+            elif dentro:
+                if k == "required" and isinstance(v, list):
+                    achados |= {str(x) for x in v}
+                elif k == "properties" and isinstance(v, dict):
+                    achados |= set(v)
+                    for sub in v.values():
+                        achados |= _campos_condicionados(sub, True)
+                else:
+                    achados |= _campos_condicionados(v, True)
+    elif isinstance(no, list):
+        for x in no:
+            achados |= _campos_condicionados(x, dentro)
+    return achados
+
+
 def _ajustar(payload: dict, esquema: dict, validador) -> tuple[dict | None, list[str]]:
     """Faz o payload OBEDECER as condicionais do esquema, ou diz que nao da.
 
@@ -109,7 +138,8 @@ def _ajustar(payload: dict, esquema: dict, validador) -> tuple[dict | None, list
     declarava a regra a mao.
 
     Aqui a pergunta vai para quem sabe responder: o esquema. Cada erro de
-    `required` que a validacao aponta vira um campo acrescentado, com o exemplo
+    `required` que a validacao aponta vira um campo acrescentado, e cada erro
+    de `minItems` vira um array preenchido ate o limite — ambos com o exemplo
     do proprio subesquema. Devolve (payload, campos_acrescentados), ou
     (None, ...) quando o payload e invalido por motivo que nao se repara — e ai
     ele nao era um vetor valido, e muda de lado.
@@ -123,21 +153,38 @@ def _ajustar(payload: dict, esquema: dict, validador) -> tuple[dict | None, list
         erros = list(validador.iter_errors(payload))
         if not erros:
             return payload, acrescentados
-        faltando = None
+        reparo = None
         for e in erros:
             for sub in ([e] + list(e.context or [])):
                 if sub.validator == "required" and sub.validator_value:
                     ausentes = [c for c in sub.validator_value if c not in payload]
                     if ausentes:
-                        faltando = ausentes[0]
+                        reparo = ("required", ausentes[0], sub)
                         break
-            if faltando:
+                # `candidates nao vazio quando state_status = AUTHORITATIVE_OUTPUT`
+                # nao e `required`: candidates JA esta em required, e a condicional
+                # exige minItems. Sem tratar isto, o vetor valido de
+                # AUTHORITATIVE_OUTPUT seria jogado para os invalidos e a faixa
+                # que o contrato admite ficaria menor em silencio.
+                if sub.validator == "minItems":
+                    caminho = list(sub.absolute_path)
+                    if len(caminho) == 1 and isinstance(caminho[0], str):
+                        reparo = ("minItems", caminho[0], sub)
+                        break
+            if reparo:
                 break
-        if faltando is None:
-            return None, acrescentados      # invalido por outro motivo
-        payload = {**payload, faltando: _exemplo(props.get(faltando) or {"type": "string"},
-                                                 faltando)}
-        acrescentados.append(faltando)
+        if reparo is None:
+            return None, acrescentados      # invalido por motivo que nao se repara
+        tipo, campo, sub = reparo
+        esq_campo = props.get(campo) or {"type": "string"}
+        if tipo == "required":
+            payload = {**payload, campo: _exemplo(esq_campo, campo)}
+        else:
+            n = int(sub.validator_value)
+            itens = esq_campo.get("items") or {"type": "string"}
+            payload = {**payload,
+                       campo: [_exemplo(itens, f"{campo}{i}") for i in range(n)]}
+        acrescentados.append(campo)
     return None, acrescentados
 
 
@@ -212,6 +259,7 @@ def vetores(payload_schema: dict) -> dict:
     # nao se repara nunca foi valido, e muda de lado com o motivo.
     from jsonschema import Draft202012Validator
     validador = Draft202012Validator(payload_schema)
+    condicionados = _campos_condicionados(payload_schema)
 
     ok, extras = [], []
     for caso in validos:
@@ -224,11 +272,30 @@ def vetores(payload_schema: dict) -> dict:
         if acrescentados:
             caso = {"caso": f"{caso['caso']} + condicional ({', '.join(acrescentados)})",
                     "payload": ajustado}
-            for campo in acrescentados:
-                extras.append({"caso": f"{campo}: exigido pela condicional do esquema",
-                               "payload": {k: v for k, v in ajustado.items() if k != campo},
-                               "porque": "if/then do payload_schema"})
         ok.append(caso)
+
+        # A REGRA CONDICIONAL VIRA TESTE. Derivar o invalido so do reparo era
+        # estreito: quando o payload ja satisfazia a condicional, nao havia
+        # reparo e nenhum vetor exercitava a regra — foi o caso de
+        # `candidates nao vazio quando state_status = AUTHORITATIVE_OUTPUT`,
+        # onde o minimo do gerador ja vinha com um candidate. Aqui a mutacao e
+        # deliberada, e so vira vetor se o ESQUEMA a recusar.
+        for campo in sorted(condicionados):
+            if campo not in ajustado:
+                continue
+            # campo que ja e obrigatorio SEMPRE nao ganha vetor novo por tira-lo:
+            # "obrigatorio ausente" ja o cobre, e dois vetores com o mesmo
+            # payload e nomes diferentes so enchem o relatorio
+            sem = ({} if campo in obrigatorios
+                   else {k: v for k, v in ajustado.items() if k != campo})
+            if sem and list(validador.iter_errors(sem)):
+                extras.append({"caso": f"{campo}: exigido pela condicional do esquema",
+                               "payload": sem, "porque": "condicional do payload_schema"})
+            if isinstance(ajustado[campo], list) and ajustado[campo]:
+                vazio = {**ajustado, campo: []}
+                if list(validador.iter_errors(vazio)):
+                    extras.append({"caso": f"{campo}: vazio, proibido pela condicional do esquema",
+                                   "payload": vazio, "porque": "condicional do payload_schema"})
     validos = ok
     vistos = {c["caso"] for c in invalidos}
     for e in extras:
@@ -417,6 +484,27 @@ def _self_test() -> int:
     diz(not any("RECUSA O QUE O CONTRATO ADMITE" in p for p in probs),
         "com a condicional no esquema, o produtor passa SEM a valvula — o que a "
         "B3 so conseguia com declaracao a mao")
+
+    # a condicional que NAO e `required`: o campo ja e obrigatorio, e a regra
+    # exige que ele nao venha VAZIO — o caso do planning-state
+    esq_min = {
+        "type": "object", "required": ["status", "itens"],
+        "properties": {"status": {"type": "string", "enum": ["RASCUNHO", "FINAL"]},
+                       "itens": {"type": "array", "items": {"type": "string"}}},
+        "allOf": [{"if": {"properties": {"status": {"const": "FINAL"}},
+                          "required": ["status"]},
+                   "then": {"properties": {"itens": {"minItems": 1}}}}],
+    }
+    vm = do_contrato("x", "1.0.0", {"x": {"1.0.0": {"payload_schema": esq_min}}})
+    finais = [c for c in vm["validos"] if c["payload"].get("status") == "FINAL"]
+    diz(bool(finais) and all(c["payload"].get("itens") for c in finais),
+        "o valido de FINAL nao sai com o array vazio que a condicional proibe")
+    diz(any(c["caso"] == "itens: vazio, proibido pela condicional do esquema"
+            for c in vm["invalidos"]),
+        "condicional de minItems tambem vira vetor INVALIDO — nao so as de `required`")
+    diz(sum(1 for c in vm["invalidos"]
+            if c["caso"].startswith("itens:") and "condicional" in c["caso"]) == 1,
+        "campo ja obrigatorio nao ganha vetor repetido por ser condicionado")
 
     print(f"\n{'TODOS OS CASOS CORRETOS' if ok else 'HOUVE FALHA'}")
     return 0 if ok else 1

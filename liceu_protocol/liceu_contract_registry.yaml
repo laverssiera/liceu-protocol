@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.9.0
+  registry_version: 2.10.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -250,9 +250,9 @@ contracts:
       - estado deve estar em AUTHORITATIVE ou AUTHORITATIVE_OUTPUT do Authority Kernel
       - WHERE_TO_BUILD e WHY_TO_BUILD sao justificativas, nao aprovacoes
       domain_invariants:
-      - candidates nao vazio quando state_status = AUTHORITATIVE_OUTPUT
+      - candidates nao vazio quando state_status = AUTHORITATIVE_OUTPUT — codificado no payload_schema (if/then com minItems), nao em prosa
       - cada candidate tem why (justificativa rastreavel a evidencia)
-      - crs obrigatorio quando ha geometria
+      - 'crs obrigatorio quando ha geometria — CONTINUA SO EM PROSA, e de proposito. O campo `where` do candidate e declarado apenas como objeto, sem estrutura, e no uso real aparece em tres formas incompativeis: GeoJSON, par lat/lon, e so atributos (municipio, zona, areas) — que e o caso da P-001, onde nao ha geometria nenhuma. Dizer QUANDO ha geometria exige decidir o que conta como geometria, e isso e decisao de contrato, nao de codificacao. Divida VIO-0007 no genoma.'
       payload_schema:
         type: object
         required:
@@ -261,6 +261,17 @@ contracts:
         - territorial_scope
         - candidates
         additionalProperties: false
+        allOf:
+        - if:
+            properties:
+              state_status:
+                const: AUTHORITATIVE_OUTPUT
+            required:
+            - state_status
+          then:
+            properties:
+              candidates:
+                minItems: 1
         properties:
           planning_request_id:
             type: string
