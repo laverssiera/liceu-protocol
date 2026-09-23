@@ -1,7 +1,7 @@
 constitution=1.15.0
-conformance_kit=0.15.0
+conformance_kit=0.16.0
 registry_checker=1.4.0
 federation_sdk=0.5.0
 boundary_checker=1.1.0
-package_date=2026-09-21
+package_date=2026-09-23
 source=repositorio liceu-protocol (ADR-001, decidida em 2026-09-18). Fonte unica; consumidores instalam o pacote, nao copiam.
