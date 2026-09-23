@@ -50,7 +50,7 @@ import re
 import sys
 import datetime
 
-CHECKER_VERSION = "1.4.0"
+CHECKER_VERSION = "1.5.0"
 
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 PRODUCER_ID = re.compile(r"^liceu\.[a-z][a-z0-9-]*$")
@@ -93,6 +93,10 @@ FERRAMENTAL = {
     "liceu_conformance.py": "G1-G5",
     "liceu_federation_sdk.py": "publicacao canonica",
     "liceu_boundary_check.py": "conformidade estatica de fronteira",
+    # Entrou no MANIFEST a mao na 0.17.0, e o gerador nao o conhecia: a
+    # primeira regeneracao apagaria a linha em silencio, e o arquivo que
+    # gera os vetores de contrato deixaria de ter identidade por byte.
+    "liceu_contract_vectors.py": "vetores derivados do payload_schema",
 }
 
 
