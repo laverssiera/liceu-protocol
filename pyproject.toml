@@ -8,7 +8,7 @@ name = "liceu-protocol"
 # registry_checker, boundary_checker) tem versoes proprias em liceu_protocol/VERSION.
 # Bump aqui = novo MANIFEST. Consumidores fixam esta versao (ADR-001: as tres Maes
 # validam sob a MESMA lei).
-version = "0.23.0"
+version = "0.24.0"
 description = "LICEU 6.0 - Constituicao, registries, conformance kit e Federation SDK (fonte unica)"
 readme = "README.md"
 requires-python = ">=3.11"
