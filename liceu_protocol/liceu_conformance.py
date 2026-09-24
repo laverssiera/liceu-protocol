@@ -642,7 +642,7 @@ CASOS = [
     governance_decision_id="g1", execution_id="x1",
     payload={"decision": "GRANTED", "subject_ref": "s1",
              "subject_content_hash": "h" * 64, "subject_version": "1",
-             "policy_refs": ["p1"], "authority_scope": "continental"})),
+             "policy_refs": ["p1"], "authority_scope": "CONTINENTAL"})),
 
  ("OPERA emite decision_id proprio (justificativa retroativa)",
   False, _base(event_type="opera.execution.created",
@@ -723,7 +723,7 @@ CASOS = [
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
              "policy_refs": ["pol-continental-01"],
-             "authority_scope": "continental"})),
+             "authority_scope": "CONTINENTAL"})),
 
  # --- G5: invariantes semanticos locais (§19) ---
  ("ARCHIMEDES AUTHORITATIVE_OUTPUT sem candidates",
@@ -777,7 +777,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "DENIED", "subject_ref": "s1",
              "subject_content_hash": "h" * 64, "subject_version": "1",
-             "policy_refs": ["p1"], "authority_scope": "continental"})),
+             "policy_refs": ["p1"], "authority_scope": "CONTINENTAL"})),
 
  ("OPERA execution.created com status RUNNING",
   False, _base(event_type="opera.execution.created",
@@ -920,7 +920,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "DENIED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental",
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL",
              "denial_reason": "licenciamento ambiental transfronteirico pendente"})),
 
  ("OPERA execution valida",
@@ -1027,7 +1027,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental",
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL",
              "legal_basis_refs": ["corredor-A"]})),
 
  ("ANCHOR usa fato de outro produtor como base juridica",
@@ -1037,7 +1037,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental",
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL",
              "legal_basis_refs": ["liceu.cea.parecer-1"]})),
 
  ("ANCHOR com legal_basis_ref vazia",
@@ -1047,7 +1047,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental",
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL",
              "legal_basis_refs": ["  "]})),
 
  ("ANCHOR com base juridica valida do liceu.legal",
@@ -1057,7 +1057,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental",
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL",
              "legal_basis_refs": ["liceu.legal.parecer-lgpd-2026-01"]})),
 
  ("ANCHOR sem legal_basis_refs — ausencia honesta e valida",
@@ -1067,7 +1067,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental"})),
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL"})),
  # --- modo READ (kit 0.6.0) ---
  # Evento LIDO do Event Store: sem os campos que o servidor nao persiste,
  # com `producer` em vez de `producer_id`, e podendo estar em versao RETIRED.
@@ -1078,7 +1078,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental"})),
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL"})),
 
  ("READ: evento em versao DEPRECATED continua valido",
   True, _lido(event_type="anchor.authorization.granted",
@@ -1087,7 +1087,7 @@ CASOS = [
     governance_decision_id="g1",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental"})),
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL"})),
 
  ("READ: violacao de autoridade em evento armazenado continua sendo achado",
   False, _lido(event_type="john.recommendation.generated",
@@ -1114,7 +1114,7 @@ CASOS = [
     governance_decision_id="g1", _mode="publish",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental"})),
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL"})),
  # --- RM1: validar formato QUANDO PRESENTE (kit 0.7.0) ---
  ("READ: payload_hash presente mas malformado -> rejeitado",
   False, _lido(event_type="anchor.authorization.granted",
@@ -1123,7 +1123,7 @@ CASOS = [
     governance_decision_id="g1", payload_hash="nao-e-hex",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental"})),
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL"})),
 
  ("READ: observed_at presente mas malformado -> rejeitado",
   False, _lido(event_type="anchor.authorization.granted",
@@ -1132,7 +1132,7 @@ CASOS = [
     governance_decision_id="g1", observed_at="ontem",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental"})),
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL"})),
 
  ("READ: payload_hash presente e valido -> aceito",
   True, _lido(event_type="anchor.authorization.granted",
@@ -1142,7 +1142,7 @@ CASOS = [
     observed_at="2026-08-01T10:00:00Z",
     payload={"decision": "GRANTED", "subject_ref": "corredor-A",
              "subject_content_hash": "h" * 64, "subject_version": "1.0.0",
-             "policy_refs": ["pol-01"], "authority_scope": "continental"})),
+             "policy_refs": ["pol-01"], "authority_scope": "CONTINENTAL"})),
 
  ("PUBLISH: envelope_fingerprint malformado -> rejeitado",
   False, _base(event_type="john.recommendation.generated",
