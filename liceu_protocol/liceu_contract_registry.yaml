@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.14.1
+  registry_version: 2.15.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -68,12 +68,14 @@ meta:
     RETIRED: REJEITA publicacao nova; AINDA valida leitura
     REGRA: aposentadoria bloqueia ESCRITA, nunca LEITURA. Se RETIRED bloqueasse leitura, eventos historicos
       deixariam de validar e a historia se tornaria irreconstruivel.
-  contagem:
-    nota: 'DERIVADA das chaves de `contracts`, nao escrita a mao. Ficou falsa duas vezes: dizia
-      8/10 desde a 2.3.0 (corrigida na 2.5.0, ver changelog_2_5_0) e 11/17 depois de a 2.14.0
-      acrescentar os quatro contratos do plano de autoridade sem recontar aqui.'
-    contract_ids: 15
-    versoes: 21
+  contagem_removida: 'REGRA (2026-10-09, titular): derivavel de outro artefato nao se escreve,
+    se deriva. Havia contract_ids e versoes escritos a mao; os dois se contam das chaves de
+    `contracts`. ESTE BLOCO FICOU FALSO DUAS VEZES pelo mesmo motivo — dizia 8/10 desde a
+    2.3.0 (corrigido na 2.5.0, ver changelog_2_5_0) e 11/17 depois de a 2.14.0 acrescentar
+    os quatro contratos do plano de autoridade sem recontar aqui (corrigido na 2.14.1). Era
+    tambem a SEGUNDA FONTE dos mesmos numeros, que o resumo do Event Registry carregava: a
+    objecao e a do ADR-002, duas funcoes calculando a mesma coisa divergem mesmo escritas
+    iguais.'
   nota_ramificacao: 'liceu.authority.human-decision NAO tem posicao_na_cadeia: e ramificacao de contingencia,
     nao elo sequencial'
 compatibility_policy:
