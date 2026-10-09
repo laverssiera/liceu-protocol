@@ -46,10 +46,10 @@ meta:
       Hoje todos os NENHUM sao caso (a).'
   nota_classe_de_autoridade: liceu.authority e a 16a CLASSE canonica, nao o 16o monolito. Produz exclusivamente
     fatos de autoridade e governanca federativa.
-  contagem:
-    soberanos: 15
-    classes_de_autoridade: 1
-    total: 16
+  contagem_removida: 'REGRA (2026-10-09, titular): derivavel de outro artefato nao se escreve,
+    se deriva. Havia soberanos, classes_de_autoridade e total escritos a mao aqui; os tres
+    se contam das chaves de `producers`. Estavam CORRETOS quando removidos — a remocao nao
+    conserta erro, impede o proximo.'
 producers:
   liceu.core:
     canonical_key: core

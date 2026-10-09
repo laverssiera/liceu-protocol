@@ -10,7 +10,7 @@ meta:
   contract_registry_sha256: 0a31482dc712f94d69a9fe4631a66ef66568355f77c93fdf178b64d8ac50b8c1
   constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
     ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
-  versao: 1.9.0
+  versao: 1.10.0
   nota_versao: campo unico e monotonico. Antes havia registry_version=1.1.0 e versao=1.2.0 simultaneos,
     e a versao anterior (1.3.0) era superior a nova declarada.
 events:
@@ -213,10 +213,16 @@ events:
     nota: event_type fora da convencao pontilhada — mantido como o codigo emite. Ver nota_de_nome no
       contrato.
 resumo:
-  nota: 'DERIVADO das chaves, nao declarado a mao. Os tres numeros anteriores estavam defasados
-    ANTES desta mudanca: diziam 8 / 10 / 12 onde havia 9 / 11 / 17. Numero em registry que
-    ninguem remede vai ficando falso devagar.'
-  CANONICAL_REGISTRY_EVENTS: 13
-  CONTRACT_IDS: 15
-  CONTRACT_VERSIONS: 21
+  contagem_removida: 'REGRA (2026-10-09, titular): derivavel de outro artefato nao se escreve,
+    se deriva. Havia CANONICAL_REGISTRY_EVENTS, CONTRACT_IDS e CONTRACT_VERSIONS escritos a
+    mao; o primeiro se conta das chaves de `events` aqui, e os outros dois das chaves de
+    `contracts` no Contract Registry. Os tres estavam DEFASADOS ate 2026-10-09: diziam 8 /
+    10 / 12 onde havia 9 / 11 / 17. A razao da regra: a lista muda e o numero nao, entao a
+    manutencao e eterna e o erro e silencioso — dos 48 estados medidos na lei, 47 nao
+    denunciariam o proprio erro.'
   IMPLEMENTED_IN_MONOLITH: 0
+  nota_do_que_ficou: 'IMPLEMENTED_IN_MONOLITH NAO e derivavel de artefato nenhum: e observacao
+    do codigo noutro repositorio, e cai no outro grupo da UNK-0018 — data e procedencia
+    obrigatorias, nao derivacao. Hoje ele nao tem nem uma nem outra, e nao esta medido como
+    falso: esta medido como AMBIGUO, porque ninguem escreveu o que conta como implementado e
+    quatro eventos passaram a ter EMITIDO_COMO_AUDITORIA_NAO_COMO_FATO.'
