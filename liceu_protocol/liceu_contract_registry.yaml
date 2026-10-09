@@ -1,11 +1,13 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.13.0
+  registry_version: 2.14.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
-  escopo: pedido de planejamento (1) + cadeia causal minima (5) + extensao CEA (2) + decisao humana (1)
-    + admissibilidade juridica (1) = 10 contract_ids
+  escopo: 'CONTADO, nao declarado: o numero abaixo e derivado das chaves de `contracts`, e o
+    anterior estava defasado — dizia 10 quando havia 11. Pedido de planejamento (1) + cadeia
+    causal minima (5) + extensao CEA (2) + decisao humana (1) + admissibilidade juridica (1)
+    + auditoria do plano de autoridade (4) = 15 contract_ids, 21 contract_versions.'
   status: DEFINIDO — 0/7 implementados. Os 2 do CEA substituem wave83/wave92 e NAO foram aplicados ao
     codigo.
   regra: 'Contrato definido nao e contrato implementado. A promocao para implementado exige conformance
@@ -1993,6 +1995,231 @@ contracts:
             - CIVILIZACIONAL
             - INTERPLANETARIA
       status: ACTIVE
+  # Auditoria do plano de autoridade — os quatro event_type `authority.` que o
+  # CORE JA emite, e que nao tinham dono declarado em lugar nenhum. Entram com
+  # posicao_na_cadeia null de proposito: sao auditoria, nao elos. Dar numero a
+  # eles faria o juiz do genoma conta-los, e a cadeia subiria sem nenhum ato
+  # novo ter acontecido — o mesmo cuidado que a FIT-016 aplica aos elos 4 e 5.
+  # Todo campo de payload foi LIDO do codigo, com a linha dita em cada um.
+  liceu.authority.fencing-rejected:
+    1.0.0:
+      contract_id: liceu.authority.fencing-rejected
+      contract_version: 1.0.0
+      status: ACTIVE
+      owner: liceu.authority
+      allowed_producers:
+      - liceu.authority
+      event_type: authority.fencing.rejected
+      posicao_na_cadeia: null
+      natureza: AUDITORIA_DO_PLANO_DE_AUTORIDADE
+      proposito: registrar que um fato foi RECUSADO na fronteira, com a regra nomeada, a epoca recebida
+        e a vigente. Recusa e fato auditavel ANTES de virar resposta HTTP.
+      procedencia_do_schema: lido de cv-backend-core/app/services/authority_control_plane.py — _reject
+        (linhas 199-208) com o context do enforce() (linhas 233-242)
+      payload_schema:
+        type: object
+        required:
+        - rule
+        - producer_id
+        - producer_instance_id
+        - authority_role
+        - event_type
+        - received_epoch
+        - current_epoch
+        properties:
+          rule:
+            type: string
+          producer_id:
+            type: string
+          producer_instance_id:
+            type:
+            - string
+            - 'null'
+          identity_producer_id:
+            type:
+            - string
+            - 'null'
+          authority_role:
+            type:
+            - string
+            - 'null'
+          event_type:
+            type: string
+          contract_id:
+            type:
+            - string
+            - 'null'
+          received_epoch:
+            type:
+            - integer
+            - 'null'
+          current_epoch:
+            type: integer
+  liceu.authority.epoch-promoted:
+    1.0.0:
+      contract_id: liceu.authority.epoch-promoted
+      contract_version: 1.0.0
+      status: ACTIVE
+      owner: liceu.authority
+      allowed_producers:
+      - liceu.authority
+      event_type: authority.epoch.promoted
+      posicao_na_cadeia: null
+      natureza: AUDITORIA_DO_PLANO_DE_AUTORIDADE
+      proposito: registrar a promocao de epoca — quem passou a ACTIVE, quem foi RETIRED, e qual atestacao
+        da Testemunha a autorizou.
+      procedencia_do_schema: lido de authority_control_plane.py — o _audit da promocao (linhas 421-426)
+        com o context do promote() (linhas 359-363)
+      payload_schema:
+        type: object
+        required:
+        - target_instance_id
+        - caller_instance_id
+        - current_epoch
+        - requested_epoch
+        - new_epoch
+        - previous_active_instance_id
+        - witness_instance_id
+        - attestation_id
+        properties:
+          target_instance_id:
+            type: string
+          caller_instance_id:
+            type: string
+          current_epoch:
+            type: integer
+          requested_epoch:
+            type: integer
+          new_epoch:
+            type: integer
+          previous_active_instance_id:
+            type:
+            - string
+            - 'null'
+          witness_instance_id:
+            type: string
+          attestation_id:
+            type: string
+      authority_invariants:
+      - witness_instance_id e attestation_id sao OBRIGATORIOS — promocao sem atestacao nao existe. A
+        porta e o promotion_requires_witness_attestation do promote() (linhas 393-398), e ela e
+        pre-condicao SEPARADA do fencing de epoca
+      - 'na Opcao B do ADR-003 a regra se mantem: o quorum decide QUEM, a atestacao decide SE. Maioria
+        em log de consenso NAO satisfaz esta exigencia, porque com tres votantes ACTIVE e SUCCESSOR
+        formam maioria sem a Testemunha'
+  liceu.authority.witness-attested:
+    1.0.0:
+      contract_id: liceu.authority.witness-attested
+      contract_version: 1.0.0
+      status: ACTIVE
+      owner: liceu.authority
+      allowed_producers:
+      - liceu.authority
+      event_type: authority.witness.attested
+      posicao_na_cadeia: null
+      natureza: AUDITORIA_DO_PLANO_DE_AUTORIDADE
+      proposito: registrar o que a Testemunha MEDIU, com o veredito derivado da sonda e o alcance de
+        cada ponta. Atestacao e resultado de sonda, nunca declaracao.
+      procedencia_do_schema: lido de authority_control_plane.py — o _audit da atestacao (linhas 603-606)
+        com o context do attest() (linhas 522-527)
+      payload_schema:
+        type: object
+        required:
+        - producer_instance_id
+        - observed_epoch
+        - current_epoch
+        - verdict
+        - active_probe_reached
+        - successor_probe_reached
+        - attestation_id
+        - expires_at
+        properties:
+          producer_instance_id:
+            type: string
+          observed_epoch:
+            type:
+            - integer
+            - 'null'
+          current_epoch:
+            type: integer
+          verdict:
+            type: string
+          concur_promotion_of:
+            type:
+            - string
+            - 'null'
+          active_probe_reached:
+            type:
+            - boolean
+            - 'null'
+          successor_probe_reached:
+            type:
+            - boolean
+            - 'null'
+          attestation_id:
+            type: string
+          expires_at:
+            type: string
+            format: date-time
+      authority_invariants:
+      - active_probe_reached e successor_probe_reached sao obrigatorios porque distinguem NAO OBSERVEI
+        de OBSERVEI QUE ESTA MORTA. Atestacao sem o alcance da sonda nao permite essa distincao, e foi
+        dela que nasceu o ACTIVE_UNOBSERVABLE
+      - a Testemunha atesta; nunca autoriza, nunca estabelece teto, nunca assume o papel da ativa. As
+        tres proibicoes estao no Producer Registry, no bloco de liceu.authority#mother-witness
+  liceu.authority.escalation-requested:
+    1.0.0:
+      contract_id: liceu.authority.escalation-requested
+      contract_version: 1.0.0
+      status: ACTIVE
+      owner: liceu.authority
+      allowed_producers:
+      - liceu.authority
+      event_type: authority.human_escalation
+      posicao_na_cadeia: null
+      natureza: AUDITORIA_DO_PLANO_DE_AUTORIDADE
+      proposito: registrar que a promocao foi BLOQUEADA e um humano foi acionado, com a completude do
+        dossie. Escalar sem contexto transfere o problema, nao a decisao.
+      procedencia_do_schema: lido de authority_control_plane.py — o _audit da escalacao (linhas 742-747),
+        o unico dos quatro com payload literal e nao derivado de context
+      nota_de_nome: event_type fora da convencao pontilhada da casa — dois segmentos e um underscore
+        dentro, onde os outros oito eventos do registry usam tres ou quatro segmentos pontilhados.
+        MANTIDO como o codigo emite, para o contrato nao embutir uma mudanca de codigo. Renomear para
+        authority.escalation.requested e decisao do titular e exige alterar o CORE.
+      payload_schema:
+        type: object
+        required:
+        - escalation_id
+        - reason
+        - target_instance_id
+        - requested_by_instance_id
+        - current_epoch
+        - dossier_completeness
+        properties:
+          escalation_id:
+            type: string
+          reason:
+            type: string
+          target_instance_id:
+            type: string
+          requested_by_instance_id:
+            type: string
+          current_epoch:
+            type: integer
+          dossier_completeness:
+            type: object
+            required:
+            - present
+            - required
+            properties:
+              present:
+                type: integer
+              required:
+                type: integer
+      nota_de_completude: 'o campo required do dossie vale 8 e o teto alcancavel e 7 — o item
+        toca_o_mundo e None fixo no build_dossier e nada o preenche. Medido e travado por teste na
+        PRF-0118 do genoma. O contrato NAO corrige isso, so registra que o numero que chega aqui pode
+        nunca igualar o required.'
 lineage_chain:
   descricao: 'Lida na vertical, esta tabela e a separacao de autoridade tornada verificavel. Nenhum produtor
     consegue emitir um campo de etapa que nao lhe pertence, entao a cadeia nao pode ser fabricada de tras

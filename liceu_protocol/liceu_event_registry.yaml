@@ -10,7 +10,7 @@ meta:
   contract_registry_sha256: 0a31482dc712f94d69a9fe4631a66ef66568355f77c93fdf178b64d8ac50b8c1
   constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
     ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
-  versao: 1.8.0
+  versao: 1.9.0
   nota_versao: campo unico e monotonico. Antes havia registry_version=1.1.0 e versao=1.2.0 simultaneos,
     e a versao anterior (1.3.0) era superior a nova declarada.
 events:
@@ -158,8 +158,65 @@ events:
     nota: 'o pedido de planejamento que o elo 1 exigia (planning_request_id) sem emissor. Decisao B2
       (2026-09-19): o HUB emite como fato de interacao, com mandate_ref obrigatorio. Quem publica e o
       HUB (outro PR, outro repo); o ARCHIMEDES passa a nomear liceu.hub como dono do BLOCKED.'
+  authority.fencing.rejected:
+    owner: liceu.authority
+    allowed_producers:
+    - liceu.authority
+    contract_id: liceu.authority.fencing-rejected
+    contract_version: 1.0.0
+    posicao_na_cadeia: null
+    descricao: fato recusado na fronteira, com a regra nomeada e as duas epocas
+    natureza: AUDITORIA_DO_PLANO_DE_AUTORIDADE
+    transport: HTTP boundary oficial
+    implementation_status: EMITIDO_COMO_AUDITORIA_NAO_COMO_FATO
+    contract_lifecycle: ACTIVE
+    schema: ver liceu.authority.fencing-rejected 1.0.0
+  authority.epoch.promoted:
+    owner: liceu.authority
+    allowed_producers:
+    - liceu.authority
+    contract_id: liceu.authority.epoch-promoted
+    contract_version: 1.0.0
+    posicao_na_cadeia: null
+    descricao: promocao de epoca, com a atestacao que a autorizou
+    natureza: AUDITORIA_DO_PLANO_DE_AUTORIDADE
+    transport: HTTP boundary oficial
+    implementation_status: EMITIDO_COMO_AUDITORIA_NAO_COMO_FATO
+    contract_lifecycle: ACTIVE
+    schema: ver liceu.authority.epoch-promoted 1.0.0
+  authority.witness.attested:
+    owner: liceu.authority
+    allowed_producers:
+    - liceu.authority
+    contract_id: liceu.authority.witness-attested
+    contract_version: 1.0.0
+    posicao_na_cadeia: null
+    descricao: o que a Testemunha mediu, com o alcance de cada sonda
+    natureza: AUDITORIA_DO_PLANO_DE_AUTORIDADE
+    transport: HTTP boundary oficial
+    implementation_status: EMITIDO_COMO_AUDITORIA_NAO_COMO_FATO
+    contract_lifecycle: ACTIVE
+    schema: ver liceu.authority.witness-attested 1.0.0
+  authority.human_escalation:
+    owner: liceu.authority
+    allowed_producers:
+    - liceu.authority
+    contract_id: liceu.authority.escalation-requested
+    contract_version: 1.0.0
+    posicao_na_cadeia: null
+    descricao: promocao bloqueada e humano acionado, com a completude do dossie
+    natureza: AUDITORIA_DO_PLANO_DE_AUTORIDADE
+    transport: HTTP boundary oficial
+    implementation_status: EMITIDO_COMO_AUDITORIA_NAO_COMO_FATO
+    contract_lifecycle: ACTIVE
+    schema: ver liceu.authority.escalation-requested 1.0.0
+    nota: event_type fora da convencao pontilhada — mantido como o codigo emite. Ver nota_de_nome no
+      contrato.
 resumo:
-  CANONICAL_REGISTRY_EVENTS: 8
-  CONTRACT_IDS: 10
-  CONTRACT_VERSIONS: 12
+  nota: 'DERIVADO das chaves, nao declarado a mao. Os tres numeros anteriores estavam defasados
+    ANTES desta mudanca: diziam 8 / 10 / 12 onde havia 9 / 11 / 17. Numero em registry que
+    ninguem remede vai ficando falso devagar.'
+  CANONICAL_REGISTRY_EVENTS: 13
+  CONTRACT_IDS: 15
+  CONTRACT_VERSIONS: 21
   IMPLEMENTED_IN_MONOLITH: 0
