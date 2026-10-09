@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.14.0
+  registry_version: 2.14.1
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.15.0
@@ -69,8 +69,11 @@ meta:
     REGRA: aposentadoria bloqueia ESCRITA, nunca LEITURA. Se RETIRED bloqueasse leitura, eventos historicos
       deixariam de validar e a historia se tornaria irreconstruivel.
   contagem:
-    contract_ids: 11
-    versoes: 17
+    nota: 'DERIVADA das chaves de `contracts`, nao escrita a mao. Ficou falsa duas vezes: dizia
+      8/10 desde a 2.3.0 (corrigida na 2.5.0, ver changelog_2_5_0) e 11/17 depois de a 2.14.0
+      acrescentar os quatro contratos do plano de autoridade sem recontar aqui.'
+    contract_ids: 15
+    versoes: 21
   nota_ramificacao: 'liceu.authority.human-decision NAO tem posicao_na_cadeia: e ramificacao de contingencia,
     nao elo sequencial'
 compatibility_policy:
