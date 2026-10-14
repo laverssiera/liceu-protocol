@@ -1,8 +1,8 @@
 meta:
   artifact: LICEU_EVENT_REGISTRY
   data: '2026-08-29'
-  constitution_version: 1.17.0
-  constitution_sha256: aa630c69af0e82e4a543a1d6dc3d866f60a261618f60a13b93d9c45db0652f8b
+  constitution_version: 1.18.0
+  constitution_sha256: 29b95fb1b72e3dd26f839bdc5bc103c98cc064c7af8d13c00cdeff3f85726d62
   regra: 'Contem SOMENTE eventos promovidos a contrato canonico. Nunca os 649 do discovery. Promocao exige:
     classificacao no ledger + schema + SemVer + dono constitucional. Este registry e a FONTE dos conformance
     tests.'

@@ -188,6 +188,21 @@ def gerar_manifest(diretorio: str) -> dict:
     return m
 
 
+def _folhas_da_lei(no, caminho=""):
+    """(caminho, valor) de cada folha. Usado pela R0G para varrer portoes sem
+    depender de onde eles moram na arvore — o par `depende_de`/`estado` do
+    core_dna e o `P1_07B` do no core estao a 90 linhas de distancia um do outro,
+    e procurar por caminho fixo foi como a varredura anterior os perdeu."""
+    if isinstance(no, dict):
+        for k, v in no.items():
+            yield from _folhas_da_lei(v, f"{caminho}.{k}" if caminho else str(k))
+    elif isinstance(no, list):
+        for i, v in enumerate(no):
+            yield from _folhas_da_lei(v, f"{caminho}[{i}]")
+    else:
+        yield caminho, no
+
+
 def verificar(const, prod_reg, contract_reg, event_reg, ledger, hashes) -> Resultado:
     r = Resultado()
 
@@ -258,6 +273,124 @@ def verificar(const, prod_reg, contract_reg, event_reg, ledger, hashes) -> Resul
                   f"lesse pip list ou importlib.metadata receberia {pv}")
         else:
             r.ok("R0F", f"versao do pacote concorda com a do kit ({pv})")
+
+    # R0G — PORTAO FANTASMA: portao que exige uma ADR JA DECIDIDA.
+    #
+    # O caso que fixou esta regra, medido em 2026-10-14: o
+    # `P1_07B_extracao_fisica` esta escrito como "ADR_REQUIRED — nao executar
+    # antes da ADR", e a ADR que ele exige e a ADR-001, que foi DECIDIDA em
+    # 2026-09-18 e EXECUTADA — o kit vive em repositorio proprio e os oito
+    # consumidores o instalam por tag. Vinte e seis dias de portao fechado
+    # pedindo o que ja existe.
+    #
+    # O VINCULO NAO ESTA NO ADR, ESTA NA LEI: nenhum dos seis documentos de ADR
+    # menciona `P1_07B`, `fronteira_fisica` ou "extracao fisica". Quem aponta e o
+    # bloco `adrs_pendentes` da Constituicao, pelo campo `referencia`. Procurar o
+    # vinculo no lado errado foi o primeiro erro desta varredura.
+    #
+    # POR QUE E REGRA E NAO CONSERTO PONTUAL: um portao que pede o que ja existe
+    # treina quem o le a ignorar portoes, e enquanto houver um, todo
+    # ADR_REQUIRED fica menos crivel. A regra existe para que o SEGUNDO nao
+    # sobreviva vinte e seis dias.
+    #
+    # NAO SE APLICA quando o kit roda INSTALADO: `docs/` nao e empacotado, igual
+    # ao `pyproject` da R0F. Nesse caso sai AVISO dizendo que NAO RODOU — nunca
+    # OK em silencio, senao esconderia exatamente o portao que ela procura.
+    docs = os.path.join(os.path.dirname(aqui_kit), "docs")
+    if not os.path.isdir(docs):
+        r.add("R0G", AVISO,
+              "docs/ fora de alcance: o kit esta rodando INSTALADO e as ADRs nao "
+              "sao empacotadas. A varredura de portao fantasma NAO RODOU")
+    else:
+        decididas, sem_estado = {}, []
+        for nome_arq in sorted(os.listdir(docs)):
+            m_adr = re.match(r"^(ADR-\d+)[-.]", nome_arq)
+            if not m_adr:
+                continue
+            with open(os.path.join(docs, nome_arq), encoding="utf-8") as fh:
+                texto = fh.read()
+            m_est = re.search(r"\*\*(?:Estado|Status):\*\*\s*([^\n]+)", texto)
+            if m_est and re.search(r"decidid[ao]|DECIDID[AO]", m_est.group(1)):
+                m_dt = re.search(r"(\d{4}-\d{2}-\d{2})", m_est.group(1))
+                decididas[m_adr.group(1)] = m_dt.group(1) if m_dt else "sem data"
+            elif not m_est:
+                sem_estado.append(m_adr.group(1))
+
+        fantasmas = []
+        # (a) a propria lista de ADRs abertas, citando uma ja decidida
+        for entrada in (const.get("adrs_pendentes") or []):
+            aid = str(entrada.get("id", ""))
+            if aid in decididas:
+                fantasmas.append(
+                    f"adrs_pendentes lista {aid} como aberta, e ela foi decidida em "
+                    f"{decididas[aid]}; a entrada aponta para {entrada.get('referencia')}")
+        # (b-bis) O PORTAO QUE NAO NOMEIA A ADR, e foi o que esta regra perdeu na
+        # primeira versao: `P1_07B_extracao_fisica` diz "ADR_REQUIRED — nao
+        # executar antes da ADR", sem dizer QUAL. O unico vinculo e o campo
+        # `referencia` de `adrs_pendentes`, que aponta para o caminho do portao.
+        # Procurar o nome da ADR dentro do texto do portao nao o acha — e um
+        # portao que exige "a ADR" no indefinido e o mais dificil de fechar,
+        # porque nada nele diz quando ja foi satisfeito.
+        folhas = dict(_folhas_da_lei(const))
+        for entrada in (const.get("adrs_pendentes") or []):
+            aid, ref = str(entrada.get("id", "")), str(entrada.get("referencia", ""))
+            if aid not in decididas or not ref:
+                continue
+            alvo = folhas.get(ref)
+            if alvo is None:
+                r.add("R0G", AVISO,
+                      f"adrs_pendentes.{aid}.referencia aponta para {ref}, que nao "
+                      f"existe mais na Constituicao: a referencia envelheceu com o "
+                      f"campo e nao se pode decidir sobre o portao")
+            elif re.search(r"ADR_REQUIRED|\bABERTA?\b|\bPENDENTE\b|nao executar",
+                           str(alvo)):
+                fantasmas.append(
+                    f"{ref} = {str(alvo)[:60]!r} e o portao NAO nomeia a ADR; quem "
+                    f"aponta e adrs_pendentes.{aid}, decidida em {decididas[aid]}")
+
+        # (b) portoes que dependem de uma ADR decidida e seguem escritos como abertos
+        #
+        # CHAVES QUE REGISTRAM O PASSADO FICAM FORA, e a razao e um falso positivo
+        # que esta propria regra produziu: o `changelog_1_18_0` escrito para
+        # FECHAR este portao cita a ADR-001 e repete a frase "nao executar antes
+        # da ADR" ao descrever o que o portao dizia — e foi acusado como portao.
+        # Changelog nao e portao: registra o passado por definicao, e um portao
+        # fechado tem de poder ser DESCRITO sem reabrir.
+        historicas = ("changelog", "nota", "corrige", "regressao", "historico")
+        for caminho, valor in _folhas_da_lei(const):
+            folha_b = caminho.rsplit(".", 1)[-1].lower()
+            if folha_b.startswith(historicas):
+                continue
+            txt = str(valor)
+            for aid, quando in decididas.items():
+                if aid not in txt:
+                    continue
+                if re.search(r"ADR_REQUIRED|\bABERTA?\b|\bPENDENTE\b|nao executar", txt):
+                    fantasmas.append(
+                        f"{caminho} nomeia {aid} (decidida em {quando}) e segue escrito "
+                        f"como bloqueio: {txt[:80]!r}")
+        # (c) o par depende_de/estado, que mora em chaves irmas
+        for caminho, dep in _folhas_da_lei(const):
+            if not caminho.endswith(".depende_de") or str(dep) not in decididas:
+                continue
+            irmao = caminho[: -len(".depende_de")] + ".estado"
+            for c2, v2 in _folhas_da_lei(const):
+                if c2 == irmao and re.search(r"\bABERTA?\b|\bPENDENTE\b", str(v2)):
+                    fantasmas.append(
+                        f"{irmao} = {str(v2)!r} enquanto {caminho} = {dep} foi decidida "
+                        f"em {decididas[str(dep)]}")
+
+        if sem_estado:
+            r.add("R0G", AVISO,
+                  f"{len(sem_estado)} ADR(s) sem campo Estado legivel "
+                  f"({', '.join(sem_estado)}): a varredura nao pode decidir sobre "
+                  f"portao que as nomeie, e dizer isso e o ponto")
+        if fantasmas:
+            for f in fantasmas:
+                r.add("R0G", ERRO, f"portao fantasma: {f}")
+        else:
+            r.ok("R0G", f"nenhum portao fantasma: {len(decididas)} ADR(s) decidida(s) "
+                        f"e nenhum portao aberto as nomeia")
 
     produtores = prod_reg["producers"]
     # Registry 2.0.0: contract_id -> contract_version -> definicao.

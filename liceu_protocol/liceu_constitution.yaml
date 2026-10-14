@@ -1,5 +1,5 @@
 meta:
-  versao: 1.17.0
+  versao: 1.18.0
   status: FINAL
   data: '2026-08-29'
   milestone_corrente: M2_FEDERATION_PROTOCOL_AND_STATIC_CONVERGENCE
@@ -33,6 +33,28 @@ meta:
     e escala, com origem na identidade autenticada; decisao humana como RAMIFICACAO de contingencia com
     escalation_reason e autenticacao forte obrigatoria; identidade semantica de replay com 12 campos;
     verificacao de hash server-side; event_id globalmente unico.'
+  changelog_1_18_0: 'MINOR (C25-07): FECHA O PORTAO FANTASMA. O
+    P1_07B_extracao_fisica exigia uma ADR que foi decidida em 2026-09-18 e
+    executada — a ADR-001, sha256 dfc6d8ede955b3987bbe6079f325e9ff19ae575ed23764de14ed9380ed09a804 —, e seguiu
+    escrito como bloqueio por 26 dias. O mesmo portao se expressava em TRES lugares
+    que nao se liam: o proprio P1_07B, o par depende_de/estado do core_dna, e a
+    entrada de adrs_pendentes. Os tres fecham aqui, e os dois primeiros passam a
+    carregar a data e o hash — "cumprido" sem referencia conferivel seria trocar um
+    portao fantasma por uma afirmacao nua.
+    O PORTAO NAO NOMEAVA A ADR QUE EXIGIA: dizia "nao executar antes da ADR", no
+    indefinido, e o unico vinculo era o campo referencia de adrs_pendentes. Nenhum
+    dos seis documentos de ADR menciona P1_07B, fronteira_fisica nem extracao
+    fisica, entao procurar o vinculo no lado do ADR nao o acha — foi o primeiro erro
+    desta varredura.
+    A VARREDURA, com escopo declarado: ADR_REQUIRED aparece como VALOR da lei UMA
+    vez, e todas as outras ocorrencias nos 19 repositorios sao prosa SOBRE este
+    portao. Na lei ha depende_de 1, bloqueia 7, obrigatorio_antes_de 1,
+    somente_entao 1 e precede_elo 3, e nenhum deles nomeia ADR decidida. Entao o
+    portao fantasma era UM, expresso em tres declaracoes, e nao ha outro.
+    E A REGRA R0G existe para que o segundo nao sobreviva 26 dias: ela acusa portao
+    que exige ADR ja decidida, inclusive quando o portao nao a nomeia, seguindo o
+    campo referencia; e avisa quando uma ADR nao tem Estado legivel, porque ai ela
+    nao pode decidir.'
   changelog_1_17_0: 'MINOR (C25-06 lote 2): o no global.campos_aceitos_pelo_servidor
     para de descrever o modelo A MAO. Sai `verificado_em`, que carregava a MESMA
     string de `procedencia` — duas copias do mesmo valor, e a objecao do ADR-002 em
@@ -1249,7 +1271,8 @@ global:
       fatos canonicos federativos: Event Store do liceu.core
     extracao_fisica_do_kernel:
       depende_de: ADR-001
-      estado: ABERTA
+      estado: 'CUMPRIDA — ADR-001 decidida em 2026-09-18 e EXECUTADA;
+        ver monolitos.core.fronteira_fisica.P1_07B_extracao_fisica para o hash'
     fronteira_semantica:
       estado: JA OBRIGATORIA
       nao_depende_da_ADR_001: true
@@ -1339,7 +1362,12 @@ monolitos:
     fronteira_fisica:
       procedencia: '[DECIDIDO 2026-08-29]'
       P1_07A_fronteira_semantica: APROVADA — imediata
-      P1_07B_extracao_fisica: ADR_REQUIRED — nao executar antes da ADR
+      P1_07B_extracao_fisica: 'CUMPRIDO — ADR-001 decidida em 2026-09-18, sha256 dfc6d8ede955b3987bbe6079f325e9ff19ae575ed23764de14ed9380ed09a804;
+        o kit vive em repositorio proprio e os oito consumidores o instalam por
+        tag. O portao ficou escrito como bloqueio por 26 dias depois de satisfeito,
+        e nao nomeava a ADR que exigia — o vinculo existia so pelo campo referencia
+        de adrs_pendentes. A regra R0G do registry_check passa a acusar portao que
+        exige ADR ja decidida, inclusive quando o portao nao a nomeia.'
       core_somente:
       - identity
       - contracts
@@ -1756,13 +1784,9 @@ monolitos:
 
         '
 pendencias: []
-adrs_pendentes:
-- id: ADR-001
-  tema: Extracao fisica do kernel constitucional do repositorio CDVIRTUAL
-  referencia: monolitos.core.fronteira_fisica.P1_07B_extracao_fisica
-  bloqueia: nada — a fronteira semantica ja e exigivel
+adrs_pendentes: []
 milestone:
-  current_constitution_version: 1.17.0
+  current_constitution_version: 1.18.0
   M1_CONSTITUTION_DEFINITION:
     status: PASS
     baseline_constitution_version: 1.0.0
