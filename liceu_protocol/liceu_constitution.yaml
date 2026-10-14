@@ -1,9 +1,7 @@
 meta:
-  versao: 1.15.0
+  versao: 1.16.0
   status: FINAL
   data: '2026-08-29'
-  pendencias_abertas: 0
-  adrs_pendentes: 1
   milestone_corrente: M2_FEDERATION_PROTOCOL_AND_STATIC_CONVERGENCE
   changelog_1_4_2: 'PATCH: corrige milestone.current_constitution_version que estava stale em 1.3.0. Nenhum
     invariante alterado. Descoberta empirica -> nova regra R0C no Registry Checker.'
@@ -35,6 +33,20 @@ meta:
     e escala, com origem na identidade autenticada; decisao humana como RAMIFICACAO de contingencia com
     escalation_reason e autenticacao forte obrigatoria; identidade semantica de replay com 12 campos;
     verificacao de hash server-side; event_id globalmente unico.'
+  changelog_1_16_0: 'MINOR (C25-06 lote 1): APAGA quatro contagens derivaveis do proprio
+    arquivo — meta.pendencias_abertas (len(pendencias)), meta.adrs_pendentes
+    (len(adrs_pendentes), a LISTA de topo, que FICA e que o boundary_check le),
+    identidade_semantica_de_replay.total (len(campos)) e
+    campos_exigidos_pelo_protocolo.total (len(campos)). E REESCREVE duas frases que
+    carregavam contagem: ci_adoption_order.nao_bloqueador e
+    federation_cognition.REGRA_DE_IDENTIDADE.aplica_a diziam "os 15", e agora dizem
+    "os monolitos" — a cura de prosa com numero e a frase deixar de carrega-lo, nao o
+    numero ser corrigido. Regra do titular de 2026-10-09: "derivavel de outro artefato"
+    nao se escreve, se deriva; decisao de classe da UNK-0018: apagar, nao corrigir.
+    MINOR e nao MAJOR porque NADA le os quatro campos: medido em 2026-10-13 nos 19
+    repositorios rastreados, em .py/.ts/.js, e o unico consumidor e
+    liceu_boundary_check.py:353, que le a LISTA de topo. As contagens seguem
+    CONFERIDAS, agora derivadas, pelo portao tools/declaracoes_de_estado.py do genoma.'
   changelog_1_15_0: 'PATCH de recuperacao (LIC-PROTOCOL-RECOVERY-003): restaura decision_id, governance_decision_id
     e execution_id no envelope; separa autoridade_da_cadeia de autoridade_do_control_plane; separa campos_exigidos_pelo_protocolo
     de campos_aceitos_pelo_servidor, este ultimo refletindo o CORE real.'
@@ -557,7 +569,7 @@ global:
     - liceu.suppliers
     - liceu.cea
     nota: P&D pode esperar — nao ha codigo para verificar
-    nao_bloqueador: CI universal dos 15 nao e blocker inicial
+    nao_bloqueador: CI universal dos monolitos nao e blocker inicial
     rampa:
       development: CRITICO
       pull_request: ALTO
@@ -691,7 +703,7 @@ global:
         geracoes_de_campo_alheio_em_producao: 44
         reivindicacoes_de_identidade: 24
         fonte: JOHN_T3_RESCAN
-      aplica_a: os 15 JOHNs locais, sem excecao
+      aplica_a: os JOHNs locais de todos os monolitos, sem excecao
       independe_do_teto: um JOHN local com teto zero tambem nao pode emitir a identidade do central. Teto
         define o QUE pode decidir; a regra de identidade define COMO assina.
     monolitos_sem_camada_cognitiva:
@@ -1253,7 +1265,6 @@ global:
     - scale
     - lineage aplicavel
     - autoridade aplicavel
-    total: 12
     regra: replay legitimo exige igualdade de TODOS
     qualquer_divergencia:
     - HTTP 409
@@ -1292,7 +1303,6 @@ global:
     - authority_epoch
     - authority_issuer_id
     - activation_certificate_id
-    total: 11
     implementation_status: NAO_INICIADA
     razao_da_separacao: requisito futuro nao pode ser rotulado como evidencia de codigo existente
 monolitos:
@@ -1748,7 +1758,7 @@ adrs_pendentes:
   referencia: monolitos.core.fronteira_fisica.P1_07B_extracao_fisica
   bloqueia: nada — a fronteira semantica ja e exigivel
 milestone:
-  current_constitution_version: 1.15.0
+  current_constitution_version: 1.16.0
   M1_CONSTITUTION_DEFINITION:
     status: PASS
     baseline_constitution_version: 1.0.0
