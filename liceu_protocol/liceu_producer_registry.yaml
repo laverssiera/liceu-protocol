@@ -1,11 +1,11 @@
 meta:
   artifact: LICEU_PRODUCER_REGISTRY
   registry_version: 1.4.0
-  constitution_version: 1.17.0
+  constitution_version: 1.18.0
   fase: P2.2
   regra: producer_id e IDENTIDADE, imutavel e independente de geografia. Localizacao vive em federation_id/node_id/scope.
     Multiplas instancias da mesma classe sao legitimas.
-  constitution_sha256: aa630c69af0e82e4a543a1d6dc3d866f60a261618f60a13b93d9c45db0652f8b
+  constitution_sha256: 29b95fb1b72e3dd26f839bdc5bc103c98cc064c7af8d13c00cdeff3f85726d62
   constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
     ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
   external_effect_criterio:

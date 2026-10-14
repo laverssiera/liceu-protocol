@@ -1,5 +1,9 @@
 # ADR-005 — Topologia do estado de autoridade: a decisão, registrada
 
+**Estado:** REGISTRO. Este documento nao decide: registra a escolha da Opcao B,
+tomada pelo titular, com as respostas do §7 datadas em 2026-10-09. A UNK-0001
+NAO fecha com ele — ver §5.3.
+
 **Data:** 2026-10-13 · **Autor da decisão:** o titular · **Redação:** derivada dos
 registros da UNK-0001 no `liceu-genome`, com data e autor de cada resposta.
 
