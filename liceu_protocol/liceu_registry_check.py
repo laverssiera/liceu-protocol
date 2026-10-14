@@ -209,6 +209,56 @@ def verificar(const, prod_reg, contract_reg, event_reg, ledger, hashes) -> Resul
         r.ok("R0C", f"Constituicao autoconsistente (corrente {mv}; "
                     f"baseline historico M1 {base})")
 
+    # R0F — a versao do PACOTE tem de concordar com a do KIT.
+    #
+    # O caso real que fixou esta regra, de 2026-10-14: a tag v0.27.0 foi
+    # publicada com VERSION dizendo conformance_kit=0.27.0 e pyproject.toml
+    # dizendo 0.26.0. O wheel instalou como 0.26.0 CONTENDO a lei 0.27.0, e nada
+    # acusou — nem o MANIFEST, que confere o conteudo de liceu_protocol/ e nao
+    # alcanca o pyproject, nem o R13, que compara os artefatos entre si. Quem
+    # leu `pip list` ou `importlib.metadata.version` recebeu 0.26.0.
+    #
+    # Duas declaracoes da mesma versao, a mao, em dois arquivos: e a classe da
+    # UNK-0018 dentro do proprio empacotamento do kit. E o pyproject acompanhou
+    # a v0.24.0, a v0.25.0 e a v0.26.0 — quebrou na primeira vez que alguem
+    # moveu uma e nao a outra.
+    #
+    # NAO SE APLICA quando o kit roda INSTALADO: o pyproject nao e empacotado.
+    # Nesse caso sai AVISO nomeando a razao, nunca OK em silencio — "N itens, N
+    # respostas": regra que nao pode rodar diz que nao rodou.
+    import os  # local, como nas outras regras deste modulo
+
+    aqui_kit = os.path.dirname(os.path.abspath(__file__))
+    pyproj = os.path.join(os.path.dirname(aqui_kit), "pyproject.toml")
+    arq_versao = os.path.join(aqui_kit, "VERSION")
+    kit_ver = None
+    if os.path.exists(arq_versao):
+        with open(arq_versao, encoding="utf-8") as fh:
+            for linha in fh:
+                if linha.startswith("conformance_kit="):
+                    kit_ver = linha.split("=", 1)[1].strip()
+    if not os.path.exists(pyproj):
+        r.add("R0F", AVISO,
+              "pyproject.toml fora de alcance: o kit esta rodando INSTALADO e o "
+              "pyproject nao e empacotado. A regra NAO RODOU, e dizer isso e o "
+              "ponto — OK em silencio aqui esconderia a divergencia")
+    elif kit_ver is None:
+        r.add("R0F", ERRO, "VERSION nao declara conformance_kit")
+    else:
+        with open(pyproj, encoding="utf-8") as fh:
+            achado = re.search(r'^version\s*=\s*"([^"]+)"', fh.read(), re.M)
+        pv = achado.group(1) if achado else None
+        if pv is None:
+            r.add("R0F", ERRO, "pyproject.toml nao declara version")
+        elif pv != kit_ver:
+            r.add("R0F", ERRO,
+                  f"versao do pacote divergente da versao do kit: "
+                  f"pyproject.toml={pv} mas VERSION conformance_kit={kit_ver}. O "
+                  f"wheel instalaria como {pv} contendo o kit {kit_ver}, e quem "
+                  f"lesse pip list ou importlib.metadata receberia {pv}")
+        else:
+            r.ok("R0F", f"versao do pacote concorda com a do kit ({pv})")
+
     produtores = prod_reg["producers"]
     # Registry 2.0.0: contract_id -> contract_version -> definicao.
     # `contratos` achatado como (cid, versao) -> definicao para as regras que
