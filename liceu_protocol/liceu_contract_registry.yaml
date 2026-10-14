@@ -3,7 +3,7 @@ meta:
   registry_version: 2.15.0
   fase: P2.1
   data: '2026-08-29'
-  constitution_version: 1.16.0
+  constitution_version: 1.17.0
   escopo: 'CONTADO, nao declarado: o numero abaixo e derivado das chaves de `contracts`, e o
     anterior estava defasado — dizia 10 quando havia 11. Pedido de planejamento (1) + cadeia
     causal minima (5) + extensao CEA (2) + decisao humana (1) + admissibilidade juridica (1)
@@ -14,7 +14,7 @@ meta:
     test passando contra produtor real.
 
     '
-  constitution_sha256: e8f3254dc2bea1f437ce899a435de6f9e23f231e8e3bd1185911d523c8010271
+  constitution_sha256: aa630c69af0e82e4a543a1d6dc3d866f60a261618f60a13b93d9c45db0652f8b
   constitution_compatibility: 'compativel com 1.12.0: fronteira do ANCHOR precisada, envelope atribuido
     ao CORE, camadas transversais e core_dna acrescentados. Nenhuma capacidade, teto ou contrato alterado.'
   nota_extensao_cea: 'DOIS contratos, nao um: wave83 e planetario e raiz; wave92 e continental e DERIVA

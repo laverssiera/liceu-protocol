@@ -1,5 +1,5 @@
 meta:
-  versao: 1.16.0
+  versao: 1.17.0
   status: FINAL
   data: '2026-08-29'
   milestone_corrente: M2_FEDERATION_PROTOCOL_AND_STATIC_CONVERGENCE
@@ -33,6 +33,28 @@ meta:
     e escala, com origem na identidade autenticada; decisao humana como RAMIFICACAO de contingencia com
     escalation_reason e autenticacao forte obrigatoria; identidade semantica de replay com 12 campos;
     verificacao de hash server-side; event_id globalmente unico.'
+  changelog_1_17_0: 'MINOR (C25-06 lote 2): o no global.campos_aceitos_pelo_servidor
+    para de descrever o modelo A MAO. Sai `verificado_em`, que carregava a MESMA
+    string de `procedencia` — duas copias do mesmo valor, e a objecao do ADR-002 em
+    estado puro. Sai `campos`, com dezesseis nomes derivaveis da classe
+    FederationEventPublishRequest. E `procedencia` perde o numero de linha e mantem
+    a ANCORA: numero de linha apodrece a cada insercao acima dele; nome de classe
+    apodrece quando alguem o renomeia, e dai o rename E o evento que a guarda acusa.
+    OS TRES ESTAVAM ERRADOS, e isto separa o lote 2 do lote 1: a lei escrevia
+    main.py:617 em DOIS campos e a classe esta na 657; e a lista de dezesseis
+    divergia do modelo de dezessete em TRES nomes — idempotency_key estava na lei e
+    nao no modelo, producer e authority_epoch estavam no modelo e nao na lei. O lote
+    1 removeu duplicata derivavel; este remove afirmacao FALSA.
+    A DERIVACAO PASSA A VIVER NA CI DO CORE, que e a unica que alcanca app/main.py:
+    cv-backend-core/tools/campos_aceitos.py deriva a linha e a lista por AST a partir
+    da ancora, e falha fechado se a ancora sumir, ficar ambigua, ou se o que a lei
+    ainda afirmar divergir do modelo.
+    MINOR porque NADA le este no: busca nos 19 repositorios rastreados em .py/.ts/.js
+    devolve apenas os dois instrumentos que o vigiam.
+    O QUE FICA, e fica de proposito: obrigatorios_para_rastreabilidade e NORMA e nao
+    estado; e campos_descartados_silenciosamente nao e derivavel de artefato nenhum,
+    porque depende do que cada produtor emite noutros repositorios — cai no grupo de
+    data e procedencia obrigatorias da UNK-0018.'
   changelog_1_16_0: 'MINOR (C25-06 lote 1): APAGA quatro contagens derivaveis do proprio
     arquivo — meta.pendencias_abertas (len(pendencias)), meta.adrs_pendentes
     (len(adrs_pendentes), a LISTA de topo, que FICA e que o boundary_check le),
@@ -150,24 +172,7 @@ global:
       por_que_sao_coisas_diferentes: autoridade_da_cadeia identifica os ATOS da cadeia causal. autoridade_do_control_plane
         identifica QUEM autoriza acima do teto. Um e lineage; o outro e governanca de instancia.
   campos_aceitos_pelo_servidor:
-    procedencia: '[CODIGO] cv-backend-core/app/main.py:617 FederationEventPublishRequest'
-    campos:
-    - event_id
-    - event_type
-    - source
-    - contract_id
-    - contract_version
-    - trace_id
-    - source_event_id
-    - parent_event_id
-    - causation_id
-    - decision_id
-    - governance_decision_id
-    - execution_id
-    - artifact_id
-    - scope
-    - payload
-    - idempotency_key
+    procedencia: '[CODIGO] cv-backend-core/app/main.py FederationEventPublishRequest'
     obrigatorios_para_rastreabilidade:
     - contract_id
     - contract_version
@@ -189,7 +194,6 @@ global:
     nota: campos de autoridade sao PERSISTIDOS mas NAO aceitos do payload — derivados da identidade autenticada
       e do control plane
     ATENCAO: esta chave descreve o que o CORE ACEITA HOJE. Nao e requisito.
-    verificado_em: cv-backend-core/app/main.py:617 FederationEventPublishRequest
   contract_version_policy:
     procedencia: '[DECIDIDO 2026-08-29]'
     formato: SemVer estrito MAJOR.MINOR.PATCH
@@ -1758,7 +1762,7 @@ adrs_pendentes:
   referencia: monolitos.core.fronteira_fisica.P1_07B_extracao_fisica
   bloqueia: nada — a fronteira semantica ja e exigivel
 milestone:
-  current_constitution_version: 1.16.0
+  current_constitution_version: 1.17.0
   M1_CONSTITUTION_DEFINITION:
     status: PASS
     baseline_constitution_version: 1.0.0
