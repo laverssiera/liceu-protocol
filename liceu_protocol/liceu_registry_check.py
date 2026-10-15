@@ -15,6 +15,9 @@ VERIFICACOES
 
   R01  os 15 producer_id SOBERANOS existem exatamente uma vez
   R01B classe de autoridade sem estado de dominio; 3 papeis declarados
+  R0H  a fonte da publicacao permitida da Testemunha tem forma conferida:
+       as tres proibicoes presentes, prefixos nao vazios e terminados em
+       ponto, fail_closed declarado, e o voto no log repetindo as tres
   R02  producer_id segue o padrao canonico e nao carrega geografia
   R03  todo `owner` de evento resolve no Producer Registry
   R04  todo `allowed_producers` resolve no Producer Registry
@@ -201,6 +204,64 @@ def _folhas_da_lei(no, caminho=""):
             yield from _folhas_da_lei(v, f"{caminho}[{i}]")
     else:
         yield caminho, no
+
+
+def _r0h_falhas(inst) -> list:
+    """R0H — a forma da FONTE da publicacao permitida da Testemunha.
+
+    Devolve a lista de falhas, vazia quando a fonte esta bem formada. Vive
+    separada de ``verificar`` para ser exercitada contra fontes defeituosas sem
+    precisar de uma Constituicao sintetica: regra escrita ao lado do dado que a
+    satisfaz esta sempre verde e nao prova nada.
+
+    O que ela NAO faz: julgar se um prefixo "autoriza". Isso e semantica, nao
+    forma, e uma regra que finge decidir semantica seria a proxima declaracao
+    que ninguem le.
+    """
+    falhas = []
+    TRES = ("nunca autoriza", "nunca estabelece teto", "nunca assume o papel da ativa")
+    proib = inst.get("PROIBICOES") or []
+    for exigida in TRES:
+        if exigida not in proib:
+            falhas.append(f"a proibicao {exigida!r} desapareceu de PROIBICOES")
+    bloco = inst.get("PUBLICACAO_PERMITIDA")
+    if not isinstance(bloco, dict):
+        falhas.append(
+            "PUBLICACAO_PERMITIDA ausente: sem ela o consumidor nao tem fonte e "
+            "recusa TODA publicacao da Testemunha (fail-closed), e a proibicao "
+            "volta a ser texto que ninguem le")
+    else:
+        pref = bloco.get("prefixos")
+        if not isinstance(pref, list) or not pref:
+            falhas.append("PUBLICACAO_PERMITIDA.prefixos ausente ou vazia")
+        else:
+            for x in pref:
+                if not isinstance(x, str) or not x.strip():
+                    falhas.append(
+                        f"prefixo vazio ou nao-texto ({x!r}): casaria com QUALQUER "
+                        f"event_type e revogaria a proibicao PARECENDO cumpri-la")
+                elif not x.endswith("."):
+                    falhas.append(
+                        f"prefixo {x!r} nao termina em ponto: a intencao aqui e "
+                        f"namespace, e event_type completo fecha a lista a um evento")
+        if not str(bloco.get("fail_closed") or "").strip():
+            falhas.append(
+                "PUBLICACAO_PERMITIDA nao declara fail_closed: o que acontece na "
+                "AUSENCIA da lista e parte da norma, nao detalhe de implementacao")
+    voto = inst.get("VOTO_NO_LOG_DE_CONSENSO")
+    if isinstance(voto, dict):
+        nao_decide = voto.get("o_que_o_voto_NAO_decide") or []
+        for exigida in TRES:
+            if exigida not in nao_decide:
+                falhas.append(
+                    f"VOTO_NO_LOG_DE_CONSENSO permite votar mas nao diz que o voto "
+                    f"NAO decide {exigida!r}: a permissao tem de repetir as tres "
+                    f"proibicoes, senao as afrouxa por omissao")
+        if voto.get("permitido") not in (True, False):
+            falhas.append(
+                "VOTO_NO_LOG_DE_CONSENSO.permitido nao e booleano: permissao "
+                "ambigua nao e permissao")
+    return falhas
 
 
 def verificar(const, prod_reg, contract_reg, event_reg, ledger, hashes) -> Resultado:
@@ -441,6 +502,42 @@ def verificar(const, prod_reg, contract_reg, event_reg, ledger, hashes) -> Resul
     dup = {k for k in chaves if chaves.count(k) > 1}
     if dup:
         r.add("R01", ERRO, f"canonical_key duplicada: {sorted(dup)}")
+
+    # R0H — A FONTE DA PUBLICACAO PERMITIDA DA TESTEMUNHA.
+    #
+    # Medido em 2026-10-15 (PRF-0178): a chave PROIBICOES era lida por NADA. A
+    # proibicao "nunca autoriza" era aplicada por uma constante Python no
+    # consumidor — WITNESS_ALLOWED_PREFIXES, em authority_control_plane.py:55 —
+    # e o registry a DESCREVIA sem ser a fonte dela. Os dois concordavam por
+    # coincidencia de autoria: se divergissem, nada perceberia.
+    #
+    # Em 2026-10-15 o titular decidiu aplicar o contrato COM O LEITOR: a lista
+    # passa a viver aqui e o consumidor a DERIVA. Esta regra guarda a FORMA da
+    # fonte, porque fonte que vira "tudo permitido" em silencio e pior que fonte
+    # nenhuma — ela revoga a proibicao parecendo cumpri-la. As mutacoes estao no
+    # --self-test, contra o auxiliar _r0h_falhas.
+    witness = None
+    for cid, cv in produtores.items():
+        for i in (cv.get("instances") or []):
+            if i.get("authority_role") == "WITNESS":
+                witness = (cid, i)
+    if witness is None:
+        r.add("R0H", AVISO,
+              "nenhuma instancia WITNESS no Producer Registry: a R0H NAO RODOU. "
+              "A R01B ja cobra os tres papeis; dizer que esta nao rodou e o ponto, "
+              "porque OK em silencio afirmaria uma fonte que nao existe")
+    else:
+        cid, inst = witness
+        falhas0h = _r0h_falhas(inst)
+        for m in falhas0h:
+            r.add("R0H", ERRO, f"{cid} WITNESS: {m}")
+        if not falhas0h:
+            pref = inst["PUBLICACAO_PERMITIDA"]["prefixos"]
+            tem_voto = isinstance(inst.get("VOTO_NO_LOG_DE_CONSENSO"), dict)
+            r.ok("R0H",
+                 f"{cid} WITNESS: 3 proibicoes presentes, {len(pref)} prefixo(s) "
+                 f"de publicacao com fail_closed declarado"
+                 + (", e o voto no log repete as tres proibicoes" if tem_voto else ""))
 
     # R02 — formato canonico, sem geografia
     ruins = [p for p in produtores if not PRODUCER_ID.match(p)]
@@ -695,6 +792,69 @@ payload_schema:
     diz(recusa("a: 1\nb: 2\n") is None, "yaml sem duplicata passa — controle positivo")
     diz(carregar_estrito("a: 1\nb: [1, 2]\n") == {"a": 1, "b": [1, 2]},
         "e o valor lido continua o mesmo do safe_load")
+
+    # ------------------------------------------------------------------
+    # R0H — as mutacoes da fonte da publicacao permitida da Testemunha.
+    #
+    # A regra nasceu junto com a emenda que ela guarda, e por isso tem de ser
+    # exercitada contra fontes DEFEITUOSAS aqui: uma regra escrita ao lado do
+    # dado que a satisfaz esta sempre verde e nao prova nada. A mutacao que mais
+    # importa e o prefixo vazio — ele revoga a proibicao PARECENDO cumpri-la.
+    r0h = _r0h_falhas
+
+    boa = {
+        "instance_id": "liceu.authority#mother-witness",
+        "authority_role": "WITNESS",
+        "PROIBICOES": ["nunca autoriza", "nunca estabelece teto",
+                       "nunca assume o papel da ativa"],
+        "PUBLICACAO_PERMITIDA": {
+            "prefixos": ["authority.witness."],
+            "fail_closed": "ausencia recusa TODA publicacao",
+        },
+    }
+    diz(not r0h(boa), "R0H aceita uma fonte bem formada")
+
+    import copy as _c
+    m = _c.deepcopy(boa); m["PUBLICACAO_PERMITIDA"]["prefixos"] = ["", "authority.witness."]
+    diz(bool(r0h(m)), "R0H recusa PREFIXO VAZIO — ele casaria com qualquer event_type")
+    m = _c.deepcopy(boa); m["PUBLICACAO_PERMITIDA"]["prefixos"] = []
+    diz(bool(r0h(m)), "R0H recusa lista de prefixos VAZIA")
+    m = _c.deepcopy(boa); del m["PUBLICACAO_PERMITIDA"]
+    diz(bool(r0h(m)), "R0H recusa a AUSENCIA do bloco: sem fonte nao ha derivacao")
+    m = _c.deepcopy(boa); m["PUBLICACAO_PERMITIDA"]["prefixos"] = ["authority.witness.attested"]
+    diz(bool(r0h(m)), "R0H recusa prefixo que e event_type COMPLETO (sem ponto final)")
+    m = _c.deepcopy(boa); del m["PUBLICACAO_PERMITIDA"]["fail_closed"]
+    diz(bool(r0h(m)), "R0H recusa fonte que nao diz o que acontece na AUSENCIA dela")
+    m = _c.deepcopy(boa); m["PROIBICOES"] = ["nunca autoriza", "nunca estabelece teto"]
+    diz(bool(r0h(m)), "R0H recusa quando uma das TRES proibicoes desaparece")
+    m = _c.deepcopy(boa)
+    m["VOTO_NO_LOG_DE_CONSENSO"] = {"permitido": True,
+                                    "o_que_o_voto_NAO_decide": ["nunca autoriza"]}
+    diz(bool(r0h(m)),
+        "R0H recusa permissao de voto que NAO repete as tres proibicoes — "
+        "afrouxar por omissao e o modo de falha desta emenda")
+    m = _c.deepcopy(boa)
+    m["VOTO_NO_LOG_DE_CONSENSO"] = {
+        "permitido": "sim",
+        "o_que_o_voto_NAO_decide": ["nunca autoriza", "nunca estabelece teto",
+                                    "nunca assume o papel da ativa"]}
+    diz(bool(r0h(m)), "R0H recusa `permitido` nao-booleano: permissao ambigua nao e permissao")
+
+    # E a fonte REAL do pacote passa pela regra que a guarda.
+    import os as _os
+    import yaml as _yy
+    _reg = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                         "liceu_producer_registry.yaml")
+    if _os.path.exists(_reg):
+        with open(_reg, "rb") as _fh:
+            _d = _yy.safe_load(_fh.read().decode("utf-8"))
+        _w = None
+        for _cid, _cv in (_d.get("producers") or {}).items():
+            for _i in (_cv.get("instances") or []):
+                if _i.get("authority_role") == "WITNESS":
+                    _w = _i
+        diz(_w is not None and not r0h(_w),
+            "a fonte REAL deste pacote passa pela R0H")
 
     # os artifacts REAIS do pacote carregam limpos
     import os
