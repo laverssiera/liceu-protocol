@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_PRODUCER_REGISTRY
-  registry_version: 1.4.0
+  registry_version: 1.5.0
   constitution_version: 1.18.0
   fase: P2.2
   regra: producer_id e IDENTIDADE, imutavel e independente de geografia. Localizacao vive em federation_id/node_id/scope.
@@ -564,6 +564,48 @@ producers:
       - nunca autoriza
       - nunca estabelece teto
       - nunca assume o papel da ativa
+      PUBLICACAO_PERMITIDA:
+        procedencia: '[APLICADO 2026-10-15] Esta lista vivia como constante Python
+          em cv-backend-core/app/services/authority_control_plane.py:55, e o
+          registry descrevia a proibicao "nunca autoriza" sem ser a fonte dela. Os
+          dois concordavam por COINCIDENCIA DE AUTORIA: se divergissem, nada
+          perceberia. Medido na PRF-0178.'
+        prefixos:
+        - authority.witness.
+        - authority.human.decision.
+        o_que_isto_e: 'a lista FECHADA de prefixos de event_type que a instancia
+          WITNESS pode publicar. Ela existe para que "nunca autoriza" seja APLICADA
+          a partir daqui, e nao reescrita no consumidor.'
+        fail_closed: 'ausencia desta chave NAO e "tudo permitido": o consumidor que
+          nao a encontrar recusa TODA publicacao da Testemunha. Lista vazia tem o
+          mesmo efeito. Prefixo vazio e PROIBIDO pela R0H, porque casaria com
+          qualquer event_type e revogaria a proibicao em silencio.'
+      VOTO_NO_LOG_DE_CONSENSO:
+        permitido: true
+        procedencia: '[DECIDIDO 2026-10-09] Opcao B do ADR-003, tres dominios
+          votantes. Texto proposto no rascunho de 2026-10-09 e aplicado em
+          2026-10-15 por decisao do titular.'
+        o_que_o_voto_decide: quem e lider do log replicado da camada A
+        o_que_o_voto_NAO_decide:
+        - nunca autoriza
+        - nunca estabelece teto
+        - nunca assume o papel da ativa
+        - substituir a atestacao exigida pela promocao
+        razao: >
+          Votar em lideranca de log e ato de PROTOCOLO, nao ato de AUTORIDADE. A
+          proibicao "nunca autoriza" permanece integral: ela proibe autorizar
+          atos, e um voto de Raft nao autoriza ato nenhum — ele ordena o log. Sem
+          esta distincao escrita, a Opcao B fica impossivel por contradicao com a
+          proibicao, ou a proibicao fica violada em silencio.
+        limite_explicito: >
+          Maioria no log NAO substitui atestacao. Com tres nos votantes, ACTIVE e
+          SUCCESSOR formam maioria sem a Testemunha; a porta da atestacao e
+          pre-condicao SEPARADA e permanece.
+        nao_passa_pelo_portao: >
+          Medido em 2026-10-15, PRF-0179: o portao de "nunca autoriza" confere o
+          event_type de um PUBLISH, dentro de enforce(). Um voto de consenso nao e
+          fato publicado e nunca passa por ali. Logo esta permissao e NORMATIVA —
+          ela remove a contradicao, e nao acrescenta mecanismo.
     campos_obrigatorios_no_envelope:
     - producer_id
     - producer_instance_id
