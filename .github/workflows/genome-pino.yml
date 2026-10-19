@@ -1,0 +1,53 @@
+name: Pino conferido pelo genoma
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pino-vivo:
+    # O README deste repositorio se intitula "Fonte unica do protocolo" e manda,
+    # com essas palavras, "Fixe a versao. As tres Maes validam sob a mesma lei so
+    # se as tres fixarem a mesma". Em 2026-10-19 ele mandava fixar v0.15.0 --
+    # quinze tags atras -- e declarava cinco de seis versoes de componente
+    # erradas. Ninguem mentiu: os numeros foram ESCRITOS em vez de derivados, e
+    # numero escrito envelhece sozinho.
+    #
+    # O bloco de versoes foi APAGADO e virou ponteiro para liceu_protocol/VERSION,
+    # porque derivavel nao se escreve. O comando de instalacao nao pode ser
+    # derivado de dentro de um Markdown: precisa de um alvo concreto. Entao ele e
+    # CONFERIDO daqui, e escrito-e-conferido e o segundo melhor depois de
+    # derivado.
+    #
+    # O detector distingue PINO VIVO de CITACAO HISTORICA, e isso nao e detalhe:
+    # uma varredura larga por versao do kit acha 49 registros historicos no
+    # ecossistema, e acusa-los pressionaria alguem a "consertar" o passado.
+    name: O pino vivo deste repositorio concorda com a fonte unica?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # A mesma razao do genome-surface.yml, e ela vale igual aqui:
+      # raw.githubusercontent.com e servido por CDN e pode devolver uma versao
+      # ANTERIOR do genoma por alguns minutos. O perigo nao e o falso vermelho,
+      # que se re-roda: e o falso VERDE -- um pino divergente passando porque o
+      # detector lido e o de antes. `git ls-remote` fala o protocolo git, sem CDN
+      # no caminho, e dai em diante tudo e buscado POR SHA, que e imutavel.
+      - name: Qual genoma vai julgar (sha autoritativo, sem CDN)
+        id: genoma
+        run: |
+          SHA=$(git ls-remote https://github.com/laverssiera/liceu-genome.git refs/heads/main | cut -f1)
+          test -n "$SHA" || { echo "nao consegui o sha do genoma - sem julgar no escuro"; exit 1; }
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "genoma que vai julgar: $SHA"
+      - name: Baixar o detector
+        env:
+          SHA: ${{ steps.genoma.outputs.sha }}
+        run: |
+          curl -fsSL -o /tmp/genome_pino_check.py \
+            https://raw.githubusercontent.com/laverssiera/liceu-genome/$SHA/tools/genome_pino_check.py
+      - name: O pino vivo concorda com liceu_protocol/VERSION?
+        run: python /tmp/genome_pino_check.py --raiz . --fonte liceu_protocol/VERSION
