@@ -4,17 +4,23 @@ Fonte única do protocolo LICEU 6.0: Constituição, Contract/Producer/Event
 Registries, conformance kit (G1–G5), Federation SDK, registry checker e boundary
 checker. Decisão: [ADR-001](docs/ADR-001-onde-o-kit-vive.md).
 
-```
-constitution=1.15.0   conformance_kit=0.15.0   federation_sdk=0.5.0
-registry_checker=1.4.0   boundary_checker=1.1.0   package_date=2026-09-18
-```
+As versões dos componentes vivem em [`liceu_protocol/VERSION`](liceu_protocol/VERSION), que se declara fonte
+única. Elas NÃO são repetidas aqui: número derivável de outro artefato não
+se escreve, se deriva — e este bloco, enquanto era escrito, ficou velho em
+cinco dos seis valores.
 
 ## Instalar
 
 Fixe a versão. As três Mães validam sob a mesma lei só se as três fixarem a mesma.
 
+O número abaixo é o único escrito neste arquivo, porque um comando precisa
+de um alvo concreto. Ele não é derivado, e por isso é CONFERIDO: a CI deste
+repositório roda o detector de pino do liceu-genome, que o compara com
+`liceu_protocol/VERSION` e reprova se divergirem. Escrito-e-conferido é o
+segundo melhor depois de derivado, e a diferença fica dita.
+
 ```bash
-pip install "liceu-protocol @ git+https://github.com/laverssiera/liceu-protocol@v0.15.0"
+pip install "liceu-protocol @ git+https://github.com/laverssiera/liceu-protocol@v0.30.0"
 ```
 
 ## Usar
