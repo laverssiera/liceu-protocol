@@ -1,0 +1,48 @@
+name: Privacidade
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  privacidade:
+    # Este repositorio e PUBLICO: dado pessoal que entrar fica na internet.
+    # Ate 2026-10-25 a varredura de privacidade rodava em UM dos quatro
+    # publicos -- o liceu-genome -- e o docstring dela dizia servir a este.
+    #
+    # BUSCADA POR SHA, NAO COPIADA: a varredura, a lista de negacao e o modulo
+    # de que ela depende vem do liceu-genome, no mesmo sha. Copia diverge em
+    # silencio; o Main Guard ja teve dezenove variantes assim.
+    name: Nenhum dado pessoal neste repositorio publico
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # `git ls-remote` devolve o sha autoritativo, sem CDN no caminho; dai em
+      # diante tudo e buscado POR SHA, e URL de sha e imutavel.
+      - name: Qual varredura vai julgar (sha autoritativo do genoma)
+        id: genoma
+        run: |
+          SHA=$(git ls-remote https://github.com/laverssiera/liceu-genome.git refs/heads/main | cut -f1)
+          test -n "$SHA" || { echo "nao consegui o sha do genoma -- sem julgar no escuro"; exit 1; }
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "varredura do genoma em: $SHA"
+      - name: Baixar a varredura, a lista de negacao e o modulo de varredura
+        env:
+          SHA: ${{ steps.genoma.outputs.sha }}
+        run: |
+          mkdir -p /tmp/privacidade
+          for f in genome_privacy_check.py varredura.py privacidade_negacao.json; do
+            curl -fsSL -o /tmp/privacidade/$f \
+              https://raw.githubusercontent.com/laverssiera/liceu-genome/$SHA/tools/$f
+          done
+      # A saida imprime os LIMITES antes do resultado: quantos padroes, que NAO
+      # confere nome em geral, se a lista de negacao foi conferida, e que le a
+      # arvore e NAO o historico. Sem o secret, o verde diz que nao conferiu.
+      - name: Varredura de privacidade
+        env:
+          LICEU_PRIVACY_HMAC_KEY: ${{ secrets.LICEU_PRIVACY_HMAC_KEY }}
+        run: python /tmp/privacidade/genome_privacy_check.py --root .
