@@ -1,6 +1,7 @@
 # ADR-007 — O mecanismo de consenso da camada A: etcd ou Raft embutido
 
-**Status:** PROPOSTO. A recomendação é da redação; **a palavra do mecanismo é do titular**. O roteiro REGIONAL v2 diz isso com essas palavras: *"o que precisa de você: [...] a palavra do mecanismo no G"*.
+**Status:** DECIDIDO pelo titular em 2026-10-25: **etcd, Opção A**. A palavra, literal: *"Minha palavra é etcd (Opção A do ADR-007)."* A recomendação e a comparação abaixo são da redação e ficam como estavam no momento da decisão.
+**Decisão, execução e comprovação são estados distintos** (regra de 2026-10-09): a escolha está registrada; nenhum etcd foi instalado, e a camada A continua no `authority_state` de cada processo, com a réplica de uma linha do PASSO F.
 **Data:** 2026-10-25 · **Responde:** UNK-0001, partes 2 e 3 do PASSO G do roteiro v2 · **Continua:** ADR-003 (as opções), ADR-005 (a decisão da Opção B).
 
 > **O que este documento é.** O ADR-005 registrou, em 2026-10-13, a decisão do titular pela **Opção B**: consenso para a camada A, com três votantes em três domínios e a Testemunha como votante. No §5.1, ele deixou uma escolha em aberto: **etcd ou Raft embutido**. Ela continua aberta, e é ela que este ADR prepara.
@@ -47,13 +48,13 @@ Pela regra que o roteiro fixou **antes** de medir: *"Se os dois tiverem sucesso,
 
 ## 3. As opções
 
-### A — etcd, processo separado (recomendada)
+### A — etcd, processo separado (recomendada, e ESCOLHIDA pelo titular em 2026-10-25)
 
 - **P4 tem régua publicada.** O etcd exige p99 de `wal_fsync_duration_seconds` abaixo de **10 ms** e 50 IOPS sequenciais (PRF-0175). Contra essa régua, seis amostras medidas passam com margem de cerca de 6,5×, e uma falha por cerca de 9,3×. Ou seja, o P4 dele **é conferível no host alvo**, e a falha conhecida é de host, não de mecanismo.
 - **Não divide o GIL com o CORE.** É um processo em Go, ao lado. A eleição dele não depende de quanto tempo um handler Python segura o interpretador.
 - **Custo:** pela recomendação do etcd, o nó custa cerca de 4× mais que o orçamento da aplicação (PRF-0142), e o preço não cai com a carga baixa da camada A (no máximo 288 escritas por dia, PRF-0173), porque o que ele compra é disco, não capacidade. **O custo não é condição deste ADR** (roteiro v2, parte 3): é pergunta de operação.
 
-### B — Raft embutido no CORE: PySyncObj (recusada por esta redação)
+### B — Raft embutido no CORE: PySyncObj (recusada)
 
 - **É uma opção só, não um campo de opções.** O raftify foi descontinuado em Python pelo próprio autor, e o rraft-py é binding não oficial que entrega só o módulo de consenso. A própria página do rraft-py diz que não há biblioteca Raft padrão em Python (PRF-0174). Escolher B é apostar no PySyncObj 0.3.17 e na manutenção dele.
 - **Divide o GIL com o CORE, e a margem medida é estreita.** A retenção do GIL sob 12 threads deu p99 de 50 ms e máximo de 154,7 ms (PRF-0197). Somada à pior cauda de fsync do mesmo dia (183,1 ms), dá **338 ms contra os 400 ms** do `raftMinTimeout`, com folga de 62 ms, **numa máquina que não é o alvo**. E isso é **limite inferior** (PRF-0200): num processador mais lento, a mesma seção segura o GIL por mais tempo. A eleição espúria não está excluída. Também não está provada, e é exatamente por isso que ela é risco.
