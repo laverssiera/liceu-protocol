@@ -1,6 +1,7 @@
 # ADR-006 — Extrair ou não o control plane de autoridade
 
-**Status:** PROPOSTO.
+**Status:** DECIDIDO pelo titular em 2026-10-26: **forma B'**. A palavra, literal: *"Decido o ADR-006 pela forma B': o estado da camada A vai para o etcd, lido por cada CORE, sem serviço separado agora."* A decisão e as condições antes do merge estão no **§9**; as seções 1 a 8 ficam como estavam em 2026-10-12, porque são a medição sobre a qual se decidiu.
+**Decisão, execução e comprovação continuam estados distintos:** nenhuma linha da camada A saiu do CORE, e nenhum etcd foi instalado.
 **Numeração:** o `ADR-005` está reservado para a topologia, como o plano do ciclo 25 o nomeia; este veio depois na numeração e antes no tempo.
 
 **O que já foi decidido, e o que isto não é.** O titular decidiu em 2026-10-09: *"Control plane extraído, só a camada A"*, com a Opção B do `ADR-003` e três domínios votantes. Pela regra final do mesmo dia — *"decisão, execução e comprovação são estados distintos"* — **este ADR não registra essa decisão como executada**. Ele mede o que ela custa, nomeia o que ela ainda não decidiu, e inclui a opção de **não extrair**, porque sem ela a comparação não é comparação.
@@ -172,3 +173,59 @@ Nenhuma das três recomenda reverter a decisão. Todas as três mudam o que a ex
 - **Não decide o acoplamento de `_aware`.** Função privada usada de fora é dívida nomeada aqui, não resolvida.
 - **Não caracteriza semântica de Postgres.** Declarado em §5 como limite, não como cobertura.
 - **Não extraiu nada.** Nenhuma linha do control plane mudou neste trabalho: o que entrou foram inventário, portão, dois testes de caracterização e este documento.
+
+---
+
+## 9. A decisão de 2026-10-26: forma B'
+
+**Decidido pelo titular em 2026-10-26.** O estado da camada A (época, ativa, papéis e atestações vigentes) **vai para o etcd** e é **lido por cada CORE**. Não haverá serviço de control plane separado **agora**.
+
+### 9.1 O que mudou desde 2026-10-12, e por que a forma B' surgiu
+
+**No serviço, quase nada.** O inventário rodado em 2026-10-26 (`tools/control_plane_inventory.py`) dá as **mesmas 23 operações**, com 9 escritas e 14 leituras, as mesmas 4 UPDATEs no `promote()` e as mesmas 3 tabelas de camada A. O arquivo teve um commit desde 12/10 (`1f6e491`, 15/10) e foi de 763 para 791 linhas. O portão do control plane **passa** na main da CONSTRUTORA (`43c48be`).
+
+**Em volta dele, a costura alargou:**
+- dois chamadores novos da camada A: `authority_self_identity.py` (13/10, a rota whoami assinada: `ensure_state`, `role_of`) e `authority_replica.py` (25/10, o PASSO F: `ensure_state`, `instance_secrets`);
+- a promoção virou **3 passos não atômicos**: o commit da camada A, a auditoria (`_audit`) e o empurrão da réplica (`authority_replica.empurrar`).
+
+**Na evidência:**
+
+| o que este ADR dizia em 12/10 | em 26/10 |
+|---|---|
+| A: "partição não resolve nada" (argumentado) | **medido**: dois escritores na mesma época (PRF-0309) |
+| A: a Testemunha "continua réplica, e não testemunha" | **CLM-0006 PROVEN sem extração**, em laboratório com três processos e armazenamentos separados (PRF-0302/0306) |
+| "CLM-0007 e UNK-0001 continuam abertas" | **CLM-0007 PROVEN** (PRF-0308); **UNK-0001 encerrada** pelo etcd (ADR-007) |
+| o custo de B "ainda não medido" | **medido em parte**: o nó etcd custa cerca de 4× (PRF-0142); teto de 288 escritas por dia (PRF-0173); régua de fsync (PRF-0175). **A taxa de publicação não está medida** |
+| — | **o P1_07B exige este ADR decidido** antes do merge (critério em `docs/2026-10-26-C2-C3-o-contrato-recusavel.md`) |
+| — | **a cláusula C2.4 (autorização sem voto) está violada** até existir consenso (PRF-0309) |
+
+**Por que B' e não B.** Quando este ADR foi escrito, "B" pressupunha um **serviço** extraído. Com o etcd escolhido (ADR-007), o árbitro externo já existe, e a camada A pode viver nele sem um processo novo entre o CORE e o etcd.
+
+| | B (serviço extraído) | **B' (decidida)** |
+|---|---|---|
+| quem arbitra a época | o serviço, sobre consenso | **o etcd** |
+| `enforce()` por publicação | leituras remotas ao serviço | leituras ao etcd, também remotas |
+| `audit_events` e `build_dossier()` | entre sistemas | **continuam no banco do CORE**; só a camada A sai |
+| processos novos para operar | o serviço e o etcd | **só o etcd** |
+| P1_07B | se aplica | **se aplica**, porque o estado sai do processo do CORE |
+
+**"Agora" é parte da decisão.** O serviço separado não foi recusado. Ele fica para quando houver motivo medido para tê-lo.
+
+### 9.2 Condições ANTES do merge da troca da fonte da época
+
+Nenhum código que mova a camada A para o etcd entra na main da CONSTRUTORA sem as cinco condições abaixo cumpridas e citadas no PR:
+
+1. **A taxa de publicação medida.** O custo da B' é **por fato publicado**, porque o `enforce()` lê a época a cada publicação. Sem a taxa, não há orçamento honesto.
+2. **A leitura da época no `enforce()` decidida e medida:** linearizável, ou cercada no efeito. Pela PRF-0182, a ordem das épocas não é conferida a jusante, e a correção do log sob partição continua estrutural **para a época** (C2.5).
+3. **A atomicidade dos três passos do `promote()` desenhada, ou a janela declarada.** Hoje são commit, auditoria e réplica, cada um no seu tempo. Com o etcd, o commit da camada A passa a ser no etcd e a auditoria fica no banco do CORE.
+4. **A porta da atestação mantida como pré-condição explícita, com teste.** O consenso não a preserva por si (CLM-0086, REFUTED pela PRF-0318). O teste é o do C5: `promote()` pelo etcd **recusando sem atestação**, e o split-brain da PRF-0309 **recusando o segundo escritor**.
+5. **O destino da réplica do passo F decidido.** Com o etcd como fonte, `authority_state_replica` fica redundante: ou sai, ou passa a cache declarado da linha do etcd. Sem decisão, ela vira uma segunda fonte silenciosa.
+
+**E uma condição de processo:** a troca precisa **provar que não tocou a regra de fencing**, rodando de novo, inteiros, os testes de fencing e de atestação, e comparando o veredito (roteiro, C5). Não existe stub de consenso no CORE a ser trocado: o cliente é escrito do zero.
+
+### 9.3 O que esta decisão não autoriza
+
+- **Não autoriza o merge**: só as cinco condições acima o autorizam.
+- **Não instala o etcd** e não escolhe provedor nem host. O envelope (cauda, custo, jitter) continua pendente de host real (ADR-007 §5.1).
+- **Não decide o serviço separado para sempre**: "agora" é parte da palavra.
+- **O laboratório do C5 é medição, não extração.** O etcd em contêineres numa branch, para medir, não aciona o P1_07B, porque o critério fala de merge no CORE.
