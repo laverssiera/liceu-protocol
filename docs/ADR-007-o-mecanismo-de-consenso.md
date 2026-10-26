@@ -94,11 +94,13 @@ Pela parte 3 do roteiro v2, literalmente: cauda, custo e jitter ficam *"declarad
 - o RTT e o jitter entre os três domínios;
 - o custo dos três nós.
 
-### 5.2 Herdado do ADR-005 §5.1, e ainda aberto
+### 5.2 Herdado do ADR-005 §5.1: o estado real, corrigido em 2026-10-26
 
-- **"Votar no log" não é "autorizar atos"**, dito em contrato.
-- **A preservação explícita da porta `promotion_requires_witness_attestation`** quando `promote()` virar proposta aceita pela maioria. A CLM-0086 segue STALE, e não se presume que o quorum a preserve.
-- **Se o portão `P1_07B_extracao_fisica` se aplica** à extração da camada A.
+**Correção.** A primeira versão desta seção dizia "ainda aberto" para os três itens. Ela copiou a pendência do ADR-005 (13/10) sem conferir a lei de hoje, e estava errada em dois deles. Conferido em 2026-10-26:
+
+- **"Votar no log" não é "autorizar atos": APLICADO em 15/10**, no Producer Registry, no bloco `VOTO_NO_LOG_DE_CONSENSO` da `mother-witness`, por decisão do titular. O que falta não é o contrato, e sim a sua **forma recusável** (os casos de voto sem autorização e de autorização sem voto), proposta em `docs/2026-10-26-C2-C3-o-contrato-recusavel.md`.
+- **A porta da atestação sob quorum: ESCRITA na lei**, nos `authority_invariants` do Contract Registry ("o quorum decide QUEM, a atestação decide SE") e no limite explícito do mesmo bloco do Producer Registry. **A CLM-0086** ("o consenso preserva a porta por si") **voltou a REFUTED** pela PRF-0318, que relê o código com escopo declarado. Quem faz a porta valer é o código, e o teste que fecha isso é o do C5.
+- **O P1_07B: ainda sem resposta para a camada A.** Ele está marcado como CUMPRIDO pela ADR-001, para a extração do kit. Um **critério** para decidir quando ele se aplica está proposto no mesmo documento, e por esse critério ele se aplica à extração da camada A, exigindo o ADR-006.
 
 ### 5.3 O que esta decisão não fecha
 
