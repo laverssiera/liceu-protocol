@@ -1,6 +1,6 @@
 meta:
   artifact: LICEU_CONTRACT_REGISTRY
-  registry_version: 2.15.0
+  registry_version: 2.16.0
   fase: P2.1
   data: '2026-08-29'
   constitution_version: 1.18.0
@@ -27,6 +27,12 @@ meta:
     por decisao: exigir forcaria preenchimento, e preenchimento sob pressao produz referencia inventada.
     Ausencia honesta e melhor que referencia falsa.'
   indexacao: contract_id -> contract_version -> definicao
+  changelog_2_16_0: 'MINOR do registry (2026-10-28, opcao A fase 1, decisao do titular): o invariante EPOCA
+    de liceu.anchor.authorization 1.1.0 e EMENDADO em tres partes -- o produtor preenche a epoca observada
+    no inicio da decisao; o CORE confere e recusa, nao recarimba; copiar a da causa continua recusado.
+    MINOR e nao PATCH: muda a OBRIGACAO do produtor, e o texto de 2026-09-21 nao foi so nome -- mandava
+    aceitar sob a epoca nova a decisao que comecou na velha. Nenhum schema ou campo alterado. Os
+    changelogs de 2.9.0 a 2.15.0 nao foram escritos aqui; estao no historico do git.'
   changelog_2_8_0: 'MINOR do registry (2026-09-22, ciclo 7): liceu.john.recommendation 2.1.0 — confidence
     opcional (calculado ou ausente); 2.0.0 RETIRED sem migracao.'
   changelog_2_7_0: 'MINOR do registry (ADR-004, 2026-09-21): liceu.archimedes.planning-proposal 1.0.0
@@ -1063,13 +1069,20 @@ contracts:
       - 'nao autoriza a si proprio: producer da causa != producer deste evento'
       - subject_ref liga a autorizacao ao objeto EXATO aprovado (hash + versao)
       - 'deny-by-default: ausencia de autorizacao nao e autorizacao'
-      - 'EPOCA: a autorizacao carrega a epoca em que foi autorizada, nao a da causa. authority_epoch e
-        campo de ENVELOPE carimbado pelo CORE com a epoca vigente no aceite (control plane); o produtor
-        nao o preenche. Se a epoca avancou entre a recomendacao (causa) e a autorizacao, a autorizacao
-        e aceita sob a epoca NOVA e a linhagem atravessa a promocao. Copiar a epoca da causa para o
-        envelope e REJEITADO (409 authority_epoch_stale) — e o fencing do F1, ja em codigo e testado
-        (test_stale_epoch_is_rejected_even_with_instance_online). Este invariante NOMEIA comportamento
-        existente; nao descreve derivacao (decidido 2026-09-21, ciclo 6).'
+      - 'EPOCA (EMENDADO pelo titular em 2026-10-28, registry 2.16.0): a autorizacao carrega a epoca
+        sob a qual foi DECIDIDA, nao a da causa. (1) O produtor PREENCHE authority_epoch com a epoca
+        OBSERVADA NO INICIO DA DECISAO (SDK: FederationClient.decisao()), nunca a do momento de publicar.
+        (2) O CORE CONFERE e RECUSA na divergencia (409 authority_epoch_stale ou authority_epoch_ahead);
+        nao sobrescreve e nao recarimba. Decisao que comecou sob a epoca N e chega depois de N+1 e
+        RECUSADA: e reaberta sob a epoca nova, ou recusada e refeita, nunca recarimbada. Causa antiga com
+        decisao INICIADA sob a epoca nova e legitima: reavaliar e legitimo, herdar nao. (3) Copiar a
+        epoca da causa para o envelope e REJEITADO (409 authority_epoch_stale) — e o fencing do F1, ja
+        em codigo e testado (test_stale_epoch_is_rejected_even_with_instance_online). FASE 1: o CORE
+        ainda aceita fato SEM epoca e o carimba com a vigente — e o defeito 1 (genoma PRF-0323 e
+        PRF-0334), aberto ate a FASE 3, cujo gatilho e a contagem de fatos sem epoca chegar a ZERO,
+        nunca uma data. O TEXTO ANTERIOR (2026-09-21, ciclo 6) dizia que o produtor nao preenche e que,
+        se a epoca avancou entre a causa e a autorizacao, a autorizacao e aceita sob a epoca NOVA: nomeava
+        comportamento como principio, e mandava adotar trabalho de epoca obsoleta.'
       - legal_basis_refs e REFERENCIA, nunca afirmacao. O ANCHOR tem autoridade institucional, nao juridica;
         declarar cobertura seria autoridade fabricada.
       - 'legal_coverage e derivado pelo CORE: COVERED se as referencias resolvem para fatos do liceu.legal;

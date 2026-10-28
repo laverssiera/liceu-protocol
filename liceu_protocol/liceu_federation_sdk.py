@@ -86,6 +86,27 @@ tem versao (ARCHIMEDES: `<state_id>:<state_version>`), a versao faz parte.
 `artifact_id` vazio nao e "sem deduplicacao": e erro.
 
 =============================================================================
+A EPOCA DA DECISAO  (opcao A, fase 1 — registry 2.16.0, SDK 0.6.0)
+=============================================================================
+
+Ate 0.5.0 nenhum produtor de dominio enviava epoca: o CORE carimbava a
+vigente no aceite, e o fato decidido sob uma Mae ja despromovida atravessava
+com a autoridade nova (genoma PRF-0323, PRF-0334). O invariante EPOCA foi
+emendado pelo titular em 2026-10-28:
+
+    d = cliente.decisao()             # le a epoca vigente NO INICIO da decisao
+    ...decide...
+    cliente.publish(..., decisao=d)   # o fato carrega a epoca sob a qual decidiu
+
+Se a epoca avancou entre os dois, o CORE recusa e o SDK levanta
+`EpocaRevogadaError` -- nao `CollisionError`, como fazia com todo 409. O
+produtor REDECIDE: ato novo, artefato novo, nunca o mesmo fato recarimbado.
+
+FASE 1: `decisao` e opcional, e o CORE ainda aceita fato sem epoca. A fase 2
+conta os fatos sem epoca por produtor; a fase 3 recusa quando a contagem
+chegar a zero.
+
+=============================================================================
 UM FATO, DOIS CAMINHOS
 =============================================================================
 
@@ -108,7 +129,7 @@ import datetime
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-SDK_VERSION = "0.5.0"
+SDK_VERSION = "0.6.0"
 
 # Variaveis canonicas. Aliases sao PROIBIDOS: ARCHIMEDES aceitava
 # FEDERATION_API_URL / CANONICAL_SERVICE_SECRET, que nenhum outro monolito
@@ -154,8 +175,48 @@ class CollisionError(FederationError):
                 f"token={self.conflict_token or '-'}")
 
 
+class EpocaRevogadaError(FederationError):
+    """409 do CORE por EPOCA: a decisao foi tomada sob uma autoridade que nao e
+    mais a vigente (authority_epoch_stale), ou sob uma que ainda nao existe
+    (authority_epoch_ahead).
+
+    NAO e colisao, e ate a 0.5.0 era lida como uma: todo 409 virava
+    CollisionError, e o produtor nunca sabia que tinha sido revogado. Saber e
+    o ponto da opcao A (registry 2.16.0, invariante EPOCA): o produtor recebe
+    a recusa e pode REDECIDIR sob a epoca nova.
+
+    REDECIDIR e um ATO NOVO: decisao() de novo, e um artefato novo (a versao
+    seguinte do estado, por exemplo). NUNCA reenviar o mesmo fato com a epoca
+    nova copiada: isso e recarimbar trabalho de epoca obsoleta, que a lei
+    proibe -- e, como o event_id deriva de artifact_id, o mesmo artefato voltaria
+    como replay do fato antigo.
+    """
+
+    def __init__(self, mensagem: str, *, regra: str, epoca_da_decisao: int | None,
+                 epoca_vigente: int | None):
+        super().__init__(mensagem)
+        self.regra = regra
+        self.epoca_da_decisao = epoca_da_decisao
+        self.epoca_vigente = epoca_vigente
+
+
 class ReadError(FederationError):
     """Leitura canonica falhou. Fail-closed: nunca degrada para banco local."""
+
+
+@dataclass(frozen=True)
+class Decisao:
+    """A autoridade sob a qual uma decisao COMECOU: a epoca vigente lida do CORE
+    no inicio do ato, nao no momento de publicar (registry 2.16.0, EPOCA (1)).
+
+    Ler no publish() deixaria o produtor zumbi passar: ele decidiu sob a epoca
+    velha e publicaria com a nova. E nao e a epoca carimbada na CAUSA: essa e o
+    proxy que o titular recusou (opcao B) -- causa antiga com decisao iniciada
+    sob a epoca nova e legitima.
+    """
+
+    authority_epoch: int
+    observada_em: str
 
 
 class ConformanceError(FederationError):
@@ -404,7 +465,8 @@ class FederationClient:
                        artifact_id: str, *, trace_id: str | None = None,
                        lineage: dict | None = None,
                        observed_at: str | None = None,
-                       event_id: str | None = None) -> dict:
+                       event_id: str | None = None,
+                       decisao: "Decisao | None" = None) -> dict:
         cfg = self.cfg
         ct = self.resolver.resolve(contract_id, cfg)
 
@@ -450,8 +512,34 @@ class FederationClient:
                     f"{ct['forbidden_envelope_fields'][k].strip().splitlines()[0]}")
             env[k] = v
 
+        # A epoca da DECISAO entra antes do fingerprint, que cobre o envelope
+        # inteiro: colada depois, o fingerprint mentiria sobre o que saiu.
+        if decisao is not None:
+            env["authority_epoch"] = decisao.authority_epoch
+
         env["envelope_fingerprint"] = envelope_fingerprint(env)
         return env
+
+    # -- a autoridade sob a qual se decide ------------------------------------
+    def decisao(self) -> Decisao:
+        """Le a epoca vigente do CORE AGORA, no inicio da decisao. Fail-closed.
+
+        Chame ANTES de decidir, e passe o resultado ao publish(decisao=...).
+        Se a epoca avancar entre este instante e a publicacao, o CORE recusa
+        (EpocaRevogadaError) e o produtor redecide -- e o que a opcao A compra.
+        """
+        if self._http is None:
+            raise ReadError("transporte HTTP ausente: sem ler a epoca do CORE nao ha decisao "
+                            "com autoridade declarada, e o SDK nao inventa uma")
+        r = self._http("GET", f"{self.cfg.api_url}/authority/state", None, self.cfg)
+        if r.get("status") != 200:
+            raise ReadError(f"leitura da epoca vigente falhou: HTTP {r.get('status')}")
+        corpo = r.get("body") if isinstance(r.get("body"), dict) else {}
+        ep = corpo.get("authority_epoch")
+        if not isinstance(ep, int) or isinstance(ep, bool) or ep < 1:
+            raise ReadError(f"o CORE respondeu sem authority_epoch inteiro >= 1: {ep!r}")
+        return Decisao(authority_epoch=ep,
+                       observada_em=datetime.datetime.now(datetime.timezone.utc).isoformat())
 
     # -- conformidade local -------------------------------------------------
     def validate(self, envelope: dict) -> None:
@@ -628,6 +716,17 @@ class FederationClient:
         #   - gravar localmente: P04, BLOCKED e a resposta correta
         if r.get("status") == 409:
             corpo_erro = r.get("body") or {}
+            # 409 de EPOCA nao e colisao: o detail do CORE nomeia a regra. Lido
+            # antes da colisao, que e o 409 sem regra de epoca.
+            detalhe = corpo_erro.get("detail") if isinstance(corpo_erro, dict) else None
+            regra = detalhe.get("code") if isinstance(detalhe, dict) else None
+            if regra in ("authority_epoch_stale", "authority_epoch_ahead"):
+                raise EpocaRevogadaError(
+                    f"o CORE recusou {env['event_id']} por epoca ({regra}): decidido sob "
+                    f"{detalhe.get('received_epoch')!r}, vigente {detalhe.get('current_epoch')!r}. "
+                    f"Redecida sob a epoca vigente -- ato novo, nunca o mesmo fato recarimbado.",
+                    regra=regra, epoca_da_decisao=detalhe.get("received_epoch"),
+                    epoca_vigente=detalhe.get("current_epoch"))
             raise CollisionError(
                 f"event_id {env['event_id']} colidiu com fato de semantica "
                 f"divergente. BLOCKED: a correcao e humana.",
@@ -1145,6 +1244,86 @@ def _self_test() -> int:
     resultados.append(("servidor sem corpo -> outcome UNKNOWN, nao PUBLISHED", ok_unknown))
     print(f"  [{'OK  ' if ok_unknown else 'FALHA'}] fail-closed  "
           f"sem `idempotent` na resposta o SDK nao afirma fato novo")
+
+    # -- a decisao carrega a epoca (opcao A fase 1, registry 2.16.0, SDK 0.6.0) --
+    estado = {"vigente": 1, "corpo_estado": None}
+    enviados_a: list[dict] = []
+
+    def http_epoca(metodo, url, body, cfg):
+        if "/core-dna/contracts/" in url:
+            return {"status": 200}
+        if url.endswith("/authority/state"):
+            corpo = estado["corpo_estado"] if estado["corpo_estado"] is not None else {
+                "status": "ok", "authority_epoch": estado["vigente"]}
+            return {"status": 200, "body": corpo}
+        enviados_a.append(body)
+        ep = body.get("authority_epoch")
+        if ep is not None and ep != estado["vigente"]:
+            regra = "authority_epoch_stale" if ep < estado["vigente"] else "authority_epoch_ahead"
+            return {"status": 409, "body": {"detail": {"code": regra, "received_epoch": ep,
+                                                       "current_epoch": estado["vigente"]}}}
+        return {"status": 200, "body": {"idempotent": False}}
+
+    cli_a = FederationClient(cfg, ContractResolver(cr, http_epoca), conf, cr, http_epoca, None)
+    rec = {"alternatives": [{"alternative_id": "A", "summary": "x"},
+                            {"alternative_id": "B", "summary": "y"}],
+           "recommended_alternative_id": "A",
+           "rationale": [{"factor": "c", "weight": 1}],
+           "evidence_refs": ["e1"], "method_version": "test-method/0.0",
+           "dissent": {"contributing_domains": ["cefeida"], "unanimous": True}}
+    lin = {"causation_id": "c1", "decision_id": "d1"}
+
+    d1 = cli_a.decisao()
+    env_d = cli_a.build_envelope("liceu.john.recommendation", rec, "art-epoca", lineage=lin, decisao=d1)
+    ok_env = (env_d.get("authority_epoch") == 1
+              and env_d["envelope_fingerprint"] == envelope_fingerprint(env_d))
+    resultados.append(("a epoca da decisao entra no envelope ANTES do fingerprint", ok_env))
+    print(f"  [{'OK  ' if ok_env else 'FALHA'}] decisao  authority_epoch no envelope, fingerprint coerente")
+
+    caso("decidido sob a epoca vigente -> aceito", True,
+         lambda: cli_a.publish("liceu.john.recommendation", rec, "art-epoca-1", lineage=lin, decisao=d1))
+
+    estado["vigente"] = 2   # a Mae foi promovida DEPOIS de a decisao comecar
+    try:
+        cli_a.publish("liceu.john.recommendation", rec, "art-epoca-2", lineage=lin, decisao=d1)
+        ok_rev = False
+    except EpocaRevogadaError as e:
+        ok_rev = (e.regra == "authority_epoch_stale" and e.epoca_da_decisao == 1 and e.epoca_vigente == 2)
+    except FederationError:
+        ok_rev = False   # CollisionError aqui era o defeito: o produtor nao saberia que foi revogado
+    resultados.append(("decisao comecada sob epoca revogada -> EpocaRevogadaError, nao colisao", ok_rev))
+    print(f"  [{'OK  ' if ok_rev else 'FALHA'}] rejeitado  decisao sob epoca revogada vira "
+          f"EpocaRevogadaError (o produtor sabe e redecide)")
+
+    caso("REDECIDIDO sob a epoca nova -> aceito", True,
+         lambda: cli_a.publish("liceu.john.recommendation", rec, "art-epoca-3", lineage=lin,
+                               decisao=cli_a.decisao()))
+
+    env_sem = cli_a.build_envelope("liceu.john.recommendation", rec, "art-sem", lineage=lin)
+    ok_sem = "authority_epoch" not in env_sem
+    resultados.append(("sem decisao o envelope sai sem epoca (FASE 1: o CORE aceita com e sem)", ok_sem))
+    print(f"  [{'OK  ' if ok_sem else 'FALHA'}] fase 1   sem decisao, sem authority_epoch (o CORE carimba)")
+
+    estado["corpo_estado"] = {"status": "ok"}
+    caso("o CORE responde sem authority_epoch -> decisao() falha fechado", False, cli_a.decisao)
+    estado["corpo_estado"] = None
+
+    def colisao_continua_colisao():
+        def http_col(metodo, url, body, cfg):
+            if "/core-dna/contracts/" in url:
+                return {"status": 200}
+            return {"status": 409, "body": {"event_id": body.get("event_id"), "diverging_fields": ["payload_hash"]}}
+        FederationClient(cfg, ContractResolver(cr, http_col), conf, cr, http_col, None).publish(
+            "liceu.john.recommendation", rec, "art-col", lineage=lin)
+    try:
+        colisao_continua_colisao()
+        ok_col = False
+    except CollisionError:
+        ok_col = True
+    except FederationError:
+        ok_col = False
+    resultados.append(("409 sem regra de epoca continua CollisionError", ok_col))
+    print(f"  [{'OK  ' if ok_col else 'FALHA'}] rejeitado  409 sem regra de epoca continua colisao")
 
     acertos = sum(1 for _, ok in resultados if ok)
     print(f"\n{acertos}/{len(resultados)} casos corretos")
