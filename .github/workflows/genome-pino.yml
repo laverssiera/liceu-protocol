@@ -39,8 +39,8 @@ jobs:
       - name: Qual genoma vai julgar (sha autoritativo, sem CDN)
         id: genoma
         run: |
-          SHA=$(git ls-remote https://github.com/laverssiera/liceu-genome.git refs/heads/main | cut -f1)
-          test -n "$SHA" || { echo "nao consegui o sha do genoma - sem julgar no escuro"; exit 1; }
+          SHA=$(git ls-remote https://github.com/laverssiera/liceu-genome-manifesto.git refs/heads/main | cut -f1)
+          test -n "$SHA" || { echo "nao consegui o sha do manifesto do genoma - sem julgar no escuro"; exit 1; }
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "genoma que vai julgar: $SHA"
       - name: Baixar o detector
@@ -48,6 +48,6 @@ jobs:
           SHA: ${{ steps.genoma.outputs.sha }}
         run: |
           curl -fsSL -o /tmp/genome_pino_check.py \
-            https://raw.githubusercontent.com/laverssiera/liceu-genome/$SHA/tools/genome_pino_check.py
+            https://raw.githubusercontent.com/laverssiera/liceu-genome-manifesto/$SHA/tools/genome_pino_check.py
       - name: O pino vivo concorda com liceu_protocol/VERSION?
         run: python /tmp/genome_pino_check.py --raiz . --fonte liceu_protocol/VERSION

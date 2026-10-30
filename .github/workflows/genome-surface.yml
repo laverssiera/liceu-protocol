@@ -12,7 +12,7 @@ jobs:
     # confere, e o gerador de vetores poderia ser reescrito sem que a prova
     # fosse refeita. A invalidacao acontece ONDE A MUDANCA ACONTECE.
     #
-    # O genoma (liceu-genome) e PUBLICO: esta CI o le, pega as provas cujo
+    # O genoma e PRIVADO (2026-10-25): esta CI le o manifesto publico dele, pega as provas cujo
     # mechanism.repo e liceu-protocol, recalcula o hash da superficie e falha
     # aqui se mudou. Sem token, e sem ninguem escrever no repositorio de ninguem.
     name: A superficie provada deste repositorio mudou?
@@ -38,8 +38,8 @@ jobs:
       - name: Qual genoma vai julgar (sha autoritativo, sem CDN)
         id: genoma
         run: |
-          SHA=$(git ls-remote https://github.com/laverssiera/liceu-genome.git refs/heads/main | cut -f1)
-          test -n "$SHA" || { echo "nao consegui o sha do genoma — sem julgar no escuro"; exit 1; }
+          SHA=$(git ls-remote https://github.com/laverssiera/liceu-genome-manifesto.git refs/heads/main | cut -f1)
+          test -n "$SHA" || { echo "nao consegui o sha do manifesto do genoma — sem julgar no escuro"; exit 1; }
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "genoma que vai julgar: $SHA"
       - name: Baixar o detector e o genoma publico
@@ -47,8 +47,8 @@ jobs:
           SHA: ${{ steps.genoma.outputs.sha }}
         run: |
           curl -fsSL -o /tmp/genome_surface_check.py \
-            https://raw.githubusercontent.com/laverssiera/liceu-genome/$SHA/tools/genome_surface_check.py
-          curl -fsSL -o /tmp/07-proofs.yaml \
-            https://raw.githubusercontent.com/laverssiera/liceu-genome/$SHA/genome/07-proofs.yaml
+            https://raw.githubusercontent.com/laverssiera/liceu-genome-manifesto/$SHA/tools/genome_surface_check.py
+          curl -fsSL -o /tmp/provas.json \
+            https://raw.githubusercontent.com/laverssiera/liceu-genome-manifesto/$SHA/provas.json
       - name: A superficie provada deste repositorio mudou?
-        run: python /tmp/genome_surface_check.py --repo liceu-protocol --root . --proofs /tmp/07-proofs.yaml
+        run: python /tmp/genome_surface_check.py --repo liceu-protocol --root . --proofs /tmp/provas.json

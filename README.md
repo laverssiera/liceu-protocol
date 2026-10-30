@@ -20,7 +20,7 @@ repositório roda o detector de pino do liceu-genome, que o compara com
 segundo melhor depois de derivado, e a diferença fica dita.
 
 ```bash
-pip install "liceu-protocol @ git+https://github.com/laverssiera/liceu-protocol@v0.30.0"
+pip install "liceu-protocol @ git+https://github.com/laverssiera/liceu-protocol@v0.31.0"
 ```
 
 ## Usar
