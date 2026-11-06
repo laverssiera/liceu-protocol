@@ -106,6 +106,19 @@ FASE 1: `decisao` e opcional, e o CORE ainda aceita fato sem epoca. A fase 2
 conta os fatos sem epoca por produtor; a fase 3 recusa quando a contagem
 chegar a zero.
 
+O TOKEN DA DECISAO (SDK 0.7.0). Um inteiro qualquer um escreve: quem le a
+epoca vigente pode envia-la sem ter decidido nada. Por isso `decisao()` nao le
+mais a epoca, ABRE a decisao em POST /authority/decisions/open, e o CORE emite
+um token. O CORE confere a emissao: token que ele nao emitiu e recusado com o
+numero de epoca certo. Um token vale para um fato, de uma instancia, e fica
+para tras quando uma decisao mais nova e aceita no mesmo recurso, mesmo na
+mesma epoca.
+
+    d = cliente.decisao(recurso="estado-42")   # sem recurso, o recurso e o produtor
+
+O token vai so no corpo do POST: fora do envelope, do fingerprint e do JetStream.
+Identifica uma decisao aberta, nao o conteudo do fato.
+
 =============================================================================
 UM FATO, DOIS CAMINHOS
 =============================================================================
@@ -129,7 +142,7 @@ import datetime
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-SDK_VERSION = "0.6.0"
+SDK_VERSION = "0.7.0"
 
 # Variaveis canonicas. Aliases sao PROIBIDOS: ARCHIMEDES aceitava
 # FEDERATION_API_URL / CANONICAL_SERVICE_SECRET, que nenhum outro monolito
@@ -200,6 +213,16 @@ class EpocaRevogadaError(FederationError):
         self.epoca_vigente = epoca_vigente
 
 
+class TokenDeDecisaoError(FederationError):
+    """409 do CORE pelo token: nao emitido, ja ligado a outro fato, ou ausente
+    quando exigido. Nao e revogacao: nao ha epoca nova a adotar, ha uma decisao
+    a abrir de novo. Token velho ou superado sobe como EpocaRevogadaError."""
+
+    def __init__(self, mensagem: str, *, regra: str):
+        super().__init__(mensagem)
+        self.regra = regra
+
+
 class ReadError(FederationError):
     """Leitura canonica falhou. Fail-closed: nunca degrada para banco local."""
 
@@ -217,6 +240,10 @@ class Decisao:
 
     authority_epoch: int
     observada_em: str
+    # repr=False: o token nao vai para log por acidente.
+    decision_token: str | None = field(default=None, repr=False)
+    token_seq: int | None = None
+    recurso: str | None = None
 
 
 class ConformanceError(FederationError):
@@ -521,25 +548,32 @@ class FederationClient:
         return env
 
     # -- a autoridade sob a qual se decide ------------------------------------
-    def decisao(self) -> Decisao:
-        """Le a epoca vigente do CORE AGORA, no inicio da decisao. Fail-closed.
+    def decisao(self, recurso: str | None = None) -> Decisao:
+        """Abre a decisao no CORE AGORA: ele emite o token, com a epoca vigente.
+        Fail-closed.
 
-        Chame ANTES de decidir, e passe o resultado ao publish(decisao=...).
-        Se a epoca avancar entre este instante e a publicacao, o CORE recusa
-        (EpocaRevogadaError) e o produtor redecide -- e o que a opcao A compra.
+        Chame ANTES de decidir, e passe o resultado ao publish(decisao=...). Uma
+        decisao, um fato. Se a epoca avancar entre este instante e a publicacao, o
+        CORE recusa (EpocaRevogadaError) e o produtor redecide -- e o que a opcao
+        A compra.
         """
         if self._http is None:
-            raise ReadError("transporte HTTP ausente: sem ler a epoca do CORE nao ha decisao "
+            raise ReadError("transporte HTTP ausente: sem abrir a decisao no CORE nao ha decisao "
                             "com autoridade declarada, e o SDK nao inventa uma")
-        r = self._http("GET", f"{self.cfg.api_url}/authority/state", None, self.cfg)
+        pedido = {"resource": recurso} if recurso else {}
+        r = self._http("POST", f"{self.cfg.api_url}/authority/decisions/open", pedido, self.cfg)
         if r.get("status") != 200:
-            raise ReadError(f"leitura da epoca vigente falhou: HTTP {r.get('status')}")
+            raise ReadError(f"abertura da decisao falhou: HTTP {r.get('status')}")
         corpo = r.get("body") if isinstance(r.get("body"), dict) else {}
         ep = corpo.get("authority_epoch")
         if not isinstance(ep, int) or isinstance(ep, bool) or ep < 1:
             raise ReadError(f"o CORE respondeu sem authority_epoch inteiro >= 1: {ep!r}")
+        token, seq = corpo.get("decision_token"), corpo.get("token_seq")
+        if not isinstance(token, str) or not token or not isinstance(seq, int) or isinstance(seq, bool):
+            raise ReadError("o CORE abriu a decisao sem token emitido: sem ele o fato seria um inteiro")
         return Decisao(authority_epoch=ep,
-                       observada_em=datetime.datetime.now(datetime.timezone.utc).isoformat())
+                       observada_em=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                       decision_token=token, token_seq=seq, recurso=corpo.get("resource"))
 
     # -- conformidade local -------------------------------------------------
     def validate(self, envelope: dict) -> None:
@@ -702,6 +736,9 @@ class FederationClient:
         # Mapear no boundary evita que o campo seja descartado em silencio.
         corpo = dict(env)
         corpo["producer"] = corpo.get("producer_id")
+        decisao = kw.get("decisao")
+        if decisao is not None and decisao.decision_token:
+            corpo["decision_token"] = decisao.decision_token
         r = self._http("POST", f"{self.cfg.api_url}/federation/events/publish",
                        corpo, self.cfg)
 
@@ -720,6 +757,16 @@ class FederationClient:
             # antes da colisao, que e o 409 sem regra de epoca.
             detalhe = corpo_erro.get("detail") if isinstance(corpo_erro, dict) else None
             regra = detalhe.get("code") if isinstance(detalhe, dict) else None
+            if regra in ("decision_token_stale", "decision_token_superseded"):
+                raise EpocaRevogadaError(
+                    f"o CORE recusou {env['event_id']} pelo token ({regra}): {detalhe.get('message')}. "
+                    f"Redecida: ato novo, nunca o mesmo fato recarimbado.",
+                    regra=regra, epoca_da_decisao=detalhe.get("token_epoch"),
+                    epoca_vigente=detalhe.get("current_epoch"))
+            if isinstance(regra, str) and regra.startswith("decision_token_"):
+                raise TokenDeDecisaoError(
+                    f"o CORE recusou {env['event_id']} pelo token ({regra}): {detalhe.get('message')}",
+                    regra=regra)
             if regra in ("authority_epoch_stale", "authority_epoch_ahead"):
                 raise EpocaRevogadaError(
                     f"o CORE recusou {env['event_id']} por epoca ({regra}): decidido sob "
@@ -1252,11 +1299,15 @@ def _self_test() -> int:
     def http_epoca(metodo, url, body, cfg):
         if "/core-dna/contracts/" in url:
             return {"status": 200}
-        if url.endswith("/authority/state"):
+        if url.endswith("/authority/decisions/open"):
+            estado["seq"] = estado.get("seq", 0) + 1
             corpo = estado["corpo_estado"] if estado["corpo_estado"] is not None else {
-                "status": "ok", "authority_epoch": estado["vigente"]}
-            return {"status": 200, "body": corpo}
+                "status": "ok", "authority_epoch": estado["vigente"], "token_seq": estado["seq"],
+                "decision_token": f"emitido-{estado['seq']}", "resource": body.get("resource") or cfg.producer_id}
+            return {"status": estado.get("status_abrir", 200), "body": corpo}
         enviados_a.append(body)
+        if estado.get("recusa_token"):
+            return {"status": 409, "body": {"detail": dict(estado["recusa_token"])}}
         ep = body.get("authority_epoch")
         if ep is not None and ep != estado["vigente"]:
             regra = "authority_epoch_stale" if ep < estado["vigente"] else "authority_epoch_ahead"
@@ -1306,7 +1357,41 @@ def _self_test() -> int:
 
     estado["corpo_estado"] = {"status": "ok"}
     caso("o CORE responde sem authority_epoch -> decisao() falha fechado", False, cli_a.decisao)
+    estado["corpo_estado"] = {"status": "ok", "authority_epoch": 2, "token_seq": 9}
+    caso("o CORE abre a decisao sem token -> decisao() falha fechado", False, cli_a.decisao)
     estado["corpo_estado"] = None
+
+    estado["status_abrir"] = 404   # CORE sem a rota: o SDK nao cai para ler a epoca
+    caso("o CORE nao abre a decisao -> decisao() falha fechado", False, cli_a.decisao)
+    estado["status_abrir"] = 200
+
+    # -- o token da decisao (SDK 0.7.0) --
+    d_tok = cli_a.decisao(recurso="estado-1")
+    r_tok = cli_a.publish("liceu.john.recommendation", rec, "art-token-1", lineage=lin, decisao=d_tok)
+    ok_post = enviados_a[-1].get("decision_token") == d_tok.decision_token and d_tok.recurso == "estado-1"
+    resultados.append(("o token vai no corpo do POST", ok_post))
+    print(f"  [{'OK  ' if ok_post else 'FALHA'}] token    vai no corpo do POST, com o recurso")
+    ok_fora = ("decision_token" not in r_tok.envelope and d_tok.decision_token not in repr(d_tok)
+               and r_tok.envelope_fingerprint == envelope_fingerprint(r_tok.envelope))
+    resultados.append(("o token fica fora do envelope, do fingerprint e do repr", ok_fora))
+    print(f"  [{'OK  ' if ok_fora else 'FALHA'}] token    fora do envelope, do fingerprint e do repr")
+
+    for regra_t, classe, nome in (("decision_token_superseded", EpocaRevogadaError, "superado"),
+                                  ("decision_token_stale", EpocaRevogadaError, "velho"),
+                                  ("decision_token_unknown", TokenDeDecisaoError, "sem emissao"),
+                                  ("decision_token_reused", TokenDeDecisaoError, "ja ligado"),
+                                  ("decision_token_required", TokenDeDecisaoError, "ausente")):
+        estado["recusa_token"] = {"code": regra_t, "message": "x", "token_epoch": 2, "current_epoch": 2}
+        try:
+            cli_a.publish("liceu.john.recommendation", rec, f"art-{regra_t}", lineage=lin, decisao=cli_a.decisao())
+            ok_t = False
+        except classe as e:
+            ok_t = e.regra == regra_t
+        except FederationError:
+            ok_t = False
+        estado["recusa_token"] = None
+        resultados.append((f"token {nome} -> {classe.__name__}", ok_t))
+        print(f"  [{'OK  ' if ok_t else 'FALHA'}] token    {nome} vira {classe.__name__}, nao colisao")
 
     def colisao_continua_colisao():
         def http_col(metodo, url, body, cfg):
