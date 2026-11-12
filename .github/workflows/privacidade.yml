@@ -1,0 +1,60 @@
+name: Privacidade
+
+# Campanha: privacidade-publica-2026-11-12 (um PR por repositorio publico:
+# liceu-protocol, liceu-design-tokens e liceu-shell; a guarda vem do
+# liceu-genome-manifesto, publicada pelo liceu-genome).
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  privacidade:
+    # Este repositorio e PUBLICO: dado pessoal que entrar fica na internet.
+    #
+    # A GUARDA VEM DO MANIFESTO, POR SHA, SEM TOKEN. Ela mora no liceu-genome,
+    # que e privado desde 2026-10-25; buscar la deixava este repositorio sem
+    # guarda nenhuma. O liceu-genome-manifesto e publico e carrega a guarda
+    # copiada byte a byte, e a CI do genoma confere a copia. Nenhuma chave de
+    # leitura do genoma entra aqui: credencial em repositorio publico e a
+    # forma exata do problema que esta guarda conserta.
+    #
+    # A LISTA DE NEGACAO NAO E PUBLICADA: os nomes entram como HMAC pelo
+    # secret LICEU_PRIVACY_NEGACAO, com a chave em LICEU_PRIVACY_HMAC_KEY.
+    # Sem os dois, o passo segue e IMPRIME "0 nomes conferidos".
+    name: Nenhum dado pessoal neste repositorio publico
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # `git ls-remote` devolve o sha autoritativo, sem CDN no caminho; dai em
+      # diante tudo e buscado POR SHA, e URL de sha e imutavel.
+      - name: Qual guarda vai julgar (sha autoritativo do manifesto)
+        id: manifesto
+        run: |
+          SHA=$(git ls-remote https://github.com/laverssiera/liceu-genome-manifesto.git refs/heads/main | cut -f1)
+          test -n "$SHA" || { echo "nao consegui o sha do manifesto -- sem julgar no escuro"; exit 1; }
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "guarda do manifesto em: $SHA"
+      - name: Baixar a guarda, o modulo de varredura e o roteiro
+        env:
+          SHA: ${{ steps.manifesto.outputs.sha }}
+        run: |
+          mkdir -p /tmp/privacidade
+          for f in genome_privacy_check.py varredura.py privacidade_ci.py; do
+            curl -fsSL -o /tmp/privacidade/$f \
+              https://raw.githubusercontent.com/laverssiera/liceu-genome-manifesto/$SHA/tools/$f
+          done
+      # Tres coisas, na mesma execucao: a guarda sobre este repositorio; o
+      # CONTROLE, uma isca montada numa pasta temporaria que tem de ser
+      # REPROVADA; e a MUTACAO, a mesma isca sem os padroes da guarda, que tem
+      # de PASSAR. A saida declara o escopo: "N padroes conferidos · M nomes
+      # conferidos · K arquivos".
+      - name: Guarda, controle e mutacao
+        env:
+          LICEU_PRIVACY_HMAC_KEY: ${{ secrets.LICEU_PRIVACY_HMAC_KEY }}
+          LICEU_PRIVACY_NEGACAO: ${{ secrets.LICEU_PRIVACY_NEGACAO }}
+        run: python /tmp/privacidade/privacidade_ci.py --root .
